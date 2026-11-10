@@ -38,7 +38,7 @@ function posTag(p,short,primaryOnly){const k=posOf(p),k2=primaryOnly?null:pos2Of
   if(short)return el("span",{class:"pos "+k,title:POS[k][0]+(k2?", também "+POS[k2][0]:""),text:posLabel(p)});
   return el("span",{class:"posw"},el("span",{class:"pos "+k,text:POS[k][0]}),k2?el("span",{class:"pos sec",title:"Posição secundária",text:"2ª "+POS[k2][0]}):null)}
 function tip(k,text){const a=ATTRS.find(x=>x[0]===k);return el("span",{class:"tip",tabindex:"0","data-tip":`${a[1]}: ${a[3]}`,"aria-label":`${a[1]}: ${a[3]}`,text:text??a[1]})}
-const full=m=>!!m&&ATTRS.every(([k])=>m[k]>=1&&m[k]<=5)&&!!POS[m.sec];
+const full=m=>!!m&&ATTRS.every(([k])=>m[k]>=1&&m[k]<=5);
 
 /* ---------- celular ---------- */
 function normPhone(s){let d=String(s||"").replace(/\D/g,"");if(d.length>11&&d.startsWith("55"))d=d.slice(2);d=d.replace(/^0+/,"");return d.length===10||d.length===11?d:null}
@@ -49,6 +49,8 @@ function sortedPlayers(){return [...S.players.entries()].map(([id,p])=>({id,...p
 function myPid(){return S.uid&&S.players.has(S.uid)?S.uid:null}
 function uidOf(pid){return S.claims.has(pid)?pid:null}
 function others(){return sortedPlayers()}
+function isOrg(pid){const ph=S.phones.get(pid);if(S.isAdmin&&S.adminPhones&&ph)return S.adminPhones.has(e164(ph));return S.players.get(pid)?.role==="org"}
+const orgChip=()=>el("span",{class:"chip org",text:"Organizador"});
 const youName=p=>p.id===myPid()?p.name+" (você)":p.name;
 function pending(){return others().filter(p=>!full(S.mine[p.id]))}
 function gated(){return !S.isAdmin&&!!myPid()&&pending().length>0}
@@ -68,16 +70,17 @@ function profile(pid){
 let tab=ls("tab")||"avaliar";
 function setTab(t){tab=t;ls("tab",t);render()}
 document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>setTab(b.dataset.tab)));
+const VIEWS=["avaliar","perfis","sorteio","resultados","grupo"];
 function renderShell(){
   const me=myPid(),g=gated();
   $("tabs").hidden=!me;$("v-login").hidden=!!me;
-  if(!me){for(const v of ["avaliar","perfis","sorteio","grupo"])$("v-"+v).hidden=true;$("who").textContent="";return false}
+  if(!me){for(const v of VIEWS)$("v-"+v).hidden=true;$("who").textContent="";return false}
   $("tab-grupo").hidden=!S.isAdmin;
-  for(const t of ["perfis","sorteio"]){$("tab-"+t).disabled=g;$("tab-"+t).title=g?"Libera depois que você avaliar todo o grupo":""}
-  if((tab==="perfis"||tab==="sorteio")&&g)tab="avaliar";
+  for(const t of ["perfis","sorteio","resultados"]){$("tab-"+t).disabled=g;$("tab-"+t).title=g?"Libera depois que você avaliar todo o grupo":""}
+  if((tab==="perfis"||tab==="sorteio"||tab==="resultados")&&g)tab="avaliar";
   if(tab==="grupo"&&!S.isAdmin)tab="avaliar";
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===tab));
-  for(const v of ["avaliar","perfis","sorteio","grupo"])$("v-"+v).hidden=v!==tab;
+  for(const v of VIEWS)$("v-"+v).hidden=v!==tab;
   $("who").textContent="Olá, "+S.players.get(me).name+(S.isAdmin?" · organizador":"");
   return true;
 }
@@ -153,7 +156,7 @@ function renderOnboard(v,os){
   const done=os.filter(x=>full(S.mine[x.id])).length;
   const first=done===0&&S.obIdx===0;
   v.append(el("h2",{text:first?"Primeiro, avalie o grupo":"Avalie o grupo"}),
-    el("p",{class:"lead",text:"Perfis e sorteio liberam quando você der nota para todos. Seja justo: a média de todo mundo é que monta os times."}),
+    el("p",{class:"lead",text:"Perfis e sorteio liberam quando você der nota para todos. Cada jogador é salvo quando você toca em Próximo. Seja justo: a média de todo mundo é que monta os times."}),
     el("div",{class:"prog"},el("span",{text:`${done} de ${os.length} avaliados`}),el("div",{class:"bar"},el("i",{style:`width:${100*done/os.length}%`}))));
   const card=el("div",{class:"ob"},el("div",{class:"count",text:`Jogador ${S.obIdx+1} de ${os.length}`}),
     el("div",{class:"name"},youName(p),posTag(p,false,true)));
@@ -167,10 +170,10 @@ function renderOnboard(v,os){
   const isLastPending=pending().filter(x=>x.id!==p.id).length===0;
   card.append(el("div",{class:"nav"},
     el("button",{class:"btn",type:"button",disabled:S.obIdx===0,text:"Anterior",onclick:()=>{S.obIdx--;render()}}),
-    el("button",{class:"btn primary big",type:"button",disabled:!full(m),text:isLastPending&&full(m)?"Concluir":"Próximo",onclick:()=>{
-      flushSave();
+    el("button",{class:"btn primary big",type:"button",disabled:!full(m),text:isLastPending&&full(m)?"Concluir":"Próximo",onclick:async ev=>{
+      const bt=ev.currentTarget;bt.disabled=true;if(!await flushSave()){bt.disabled=false;return}
       const rest=pending();
-      if(!rest.length){S.obDone=true;S.obIdx=null;status("Pronto! Você avaliou todo o grupo. Perfis e sorteio liberados.");setTab("perfis");return}
+      if(!rest.length){S.obDone=true;S.obIdx=null;status("Pronto! Você avaliou todo o grupo. Perfis e sorteio liberados. "+lockText());setTab("perfis");return}
       const after=os.findIndex((x,i)=>i>S.obIdx&&!full(S.mine[x.id]));S.obIdx=after>=0?after:os.findIndex(x=>!full(S.mine[x.id]));render();window.scrollTo({top:0})}})));
   v.append(card,el("div",{class:"saveState",id:"saveState",text:saveMsg}));
 }
@@ -179,11 +182,11 @@ function secQuestion(p,m,big){
   const prim=posOf(p);const opts=POS_KEYS.filter(k=>k!==prim);
   const dots=el("div",{class:"dots sec",role:"group","aria-label":"Posição secundária de "+p.name});
   for(const k of opts)dots.append(el("button",{type:"button",class:m.sec===k?"on":"","aria-pressed":String(m.sec===k),"data-p":p.id,"data-k":"sec","data-v":k,text:POS[k][0]}));
-  if(big)return el("div",{class:"q"},el("div",{},el("b",{text:"Posição secundária ideal"}),el("small",{text:`Além de ${POS[prim][0].toLowerCase()}, onde ${p.id===myPid()?"você":p.name.split(" ")[0]} rende melhor?`})),dots);
-  return el("div",{class:"attr"},el("span",{text:"2ª posição"}),dots);
+  if(big)return el("div",{class:"q"},el("div",{},el("b",{text:"Posição secundária ideal (opcional)"}),el("small",{text:`Além de ${POS[prim][0].toLowerCase()}, onde ${p.id===myPid()?"você":p.name.split(" ")[0]} rende melhor? Toque de novo para desmarcar.`})),dots);
+  return el("div",{class:"attr"},el("span",{title:"Opcional",text:"2ª posição"}),dots);
 }
 function renderRateList(v,os){
-  v.append(el("h2",{text:"Suas notas"}),el("p",{class:"lead",text:"Você já avaliou todo o grupo. Pode ajustar qualquer nota quando quiser; ela salva sozinha."}),el("div",{class:"saveState",id:"saveState",text:saveMsg}));
+  v.append(el("h2",{text:"Suas notas"}),el("p",{class:"lead",text:"Toque nas notas que quiser mudar e depois em Salvar notas, no fim da página."}),lockBox());
   const list=el("div",{class:"list"});
   for(const p of os){
     const m=S.mine[p.id]||{};
@@ -194,27 +197,52 @@ function renderRateList(v,os){
       const lb=tip(k,label);attrs.append(el("div",{class:"attr"},lb,dots));
     }
     attrs.append(secQuestion(p,m,false));
-    list.append(el("div",{class:"rate"+(full(m)?" done":"")},el("div",{class:"hd"},el("span",{class:"pname",text:youName(p)}),posTag(p,false,true)),attrs));
+    const lk=entryLocked(p.id);
+    if(lk)attrs.querySelectorAll("button").forEach(b=>{b.disabled=true});
+    list.append(el("div",{class:"rate"+(full(m)?" done":"")+(lk?" locked":"")},el("div",{class:"hd"},el("span",{class:"pname",text:youName(p)}),el("span",{class:"row",style:"gap:6px"},lk?el("span",{class:"chip lock",text:"Travada"}):null,posTag(p,false,true))),attrs));
   }
-  v.append(list);
+  v.append(list,saveBar());
 }
 $("v-avaliar").addEventListener("click",e=>{
   const b=e.target.closest("button[data-p]");if(!b)return;
   const p=b.dataset.p,k=b.dataset.k,n=k==="sec"?b.dataset.v:+b.dataset.v;
-  S.mine[p]={...(S.mine[p]||{}),[k]:n};
-  queueSave();render();
+  if(entryLocked(p))return;
+  const cur={...(S.mine[p]||{})};const off=k==="sec"&&cur.sec===n;
+  if(off)delete cur.sec;else cur[k]=n;S.mine[p]=cur;S.dirty=true;
+  /* atualiza só o que mudou: redesenhar a lista inteira a cada toque travava o celular */
+  for(const x of b.parentElement.querySelectorAll("button")){const on=x===b&&!off;x.classList.toggle("on",on);x.setAttribute("aria-pressed",String(on))}
+  const card=b.closest(".rate");if(card)card.classList.toggle("done",full(S.mine[p]));
+  const nx=document.querySelector(".ob .nav .btn.primary");if(nx){nx.disabled=!full(S.mine[p]);if(full(S.mine[p])&&pending().filter(x=>x.id!==p).length===0)nx.textContent="Concluir"}
+  setSaveMsg("Você tem alterações que ainda não foram salvas.",true);
 });
+window.addEventListener("beforeunload",e=>{if(S.dirty){e.preventDefault();e.returnValue=""}});
+const monthName=d=>d.toLocaleDateString("pt-BR",{month:"long"});
+const sameMonth=(a,b)=>{const x=new Date(a),y=new Date(b);return x.getFullYear()===y.getFullYear()&&x.getMonth()===y.getMonth()};
+function entryLocked(pid){return !!S.notes.locked&&full(S.savedMine[pid])}
+function lockText(){
+  if(S.notes.locked)return `Suas notas estão travadas desde ${dateBR(S.notes.lockedAt||Date.now())}, quando foi jogada a primeira partida do mês. Para mudar, o presidente precisa abrir uma revisão. Jogadores que você ainda não avaliou continuam liberados.`;
+  const now=new Date();const playedThisMonth=S.matches.some(m=>sameMonth(m.at,now));
+  const target=playedThisMonth?new Date(now.getFullYear(),now.getMonth()+1,1):now;
+  return `Você pode alterar suas notas até a primeira partida de ${monthName(target)}. Depois disso elas ficam travadas, e só o presidente libera uma revisão.`;
+}
+function lockBox(){return el("p",{class:"lockinfo"+(S.notes.locked?" on":""),id:"lockInfo",text:lockText()})}
+function saveBar(){
+  const btn=el("button",{class:"btn primary big",type:"button",id:"saveNotes",text:"Salvar notas",onclick:async()=>{btn.disabled=true;btn.textContent="Salvando…";
+    const ok=await saveMine();btn.disabled=false;btn.textContent="Salvar notas";
+    if(ok){setSaveMsg("Notas salvas.");status("Notas salvas. "+lockText())}}});
+  return el("div",{class:"savebar"+(S.dirty?" dirty":""),id:"saveBar"},el("div",{class:"saveState",id:"saveState",text:S.dirty?"Você tem alterações que ainda não foram salvas.":saveMsg}),btn);
+}
 
 let saveTimer=null,saving=false,saveMsg="";
-function setSaveMsg(t){saveMsg=t;const s=$("saveState");if(s)s.textContent=t}
+function setSaveMsg(t,dirty){saveMsg=dirty?"":t;const s=$("saveState");if(s)s.textContent=t;const b=$("saveBar");if(b)b.classList.toggle("dirty",!!dirty)}
 function queueSave(){S.dirty=true;setSaveMsg("Salvando…");clearTimeout(saveTimer);saveTimer=setTimeout(saveMine,700)}
-function flushSave(){if(S.dirty){clearTimeout(saveTimer);saveMine()}}
+function flushSave(){if(S.dirty){clearTimeout(saveTimer);return saveMine()}return Promise.resolve(true)}
 async function saveMine(){
-  if(saving){queueSave();return}
+  if(saving)return false;
   saving=true;
-  const scores={};for(const pid in S.mine)if(S.players.has(pid)&&Object.keys(S.mine[pid]).length)scores[pid]=S.mine[pid];
-  try{await S.db.collection("ratings").doc(S.uid).set({scores,raterPid:myPid(),updatedAt:Date.now()});S.dirty=false;setSaveMsg("Notas salvas")}
-  catch(err){setSaveMsg("");status(err.code==="permission-denied"?"Sem permissão para salvar suas notas. Saia e entre de novo com seu celular.":"Não deu para salvar suas notas agora. Elas serão enviadas na próxima nota que você der.",true)}
+  const scores={};for(const pid in S.mine)if(S.players.has(pid)&&Object.keys(S.mine[pid]).length)scores[pid]=entryLocked(pid)?S.savedMine[pid]:S.mine[pid];
+  try{await S.db.collection("ratings").doc(S.uid).set({scores,raterPid:myPid(),updatedAt:Date.now()});S.dirty=false;S.savedMine=JSON.parse(JSON.stringify(scores));setSaveMsg("Notas salvas.");return true}
+  catch(err){setSaveMsg("Não foi salvo. Toque em Salvar notas de novo.",true);status(err.code==="permission-denied"?"Sem permissão para salvar suas notas. Saia e entre de novo com seu celular.":"Não deu para salvar suas notas agora. Confira a internet e toque em Salvar notas de novo.",true);return false}
   finally{saving=false}
 }
 
@@ -233,8 +261,8 @@ function renderCards(){
   for(const p of ps){const r=p.pr.raters;
     c.append(el("div",{class:"card"},
       el("div",{class:"top"},el("div",{class:"ovr"+(p.pr.ovr==null?" none":""),text:fmt(p.pr.ovr)}),
-        el("div",{class:"meta"},el("div",{class:"pname",text:p.name+(p.id===me?" (você)":"")}),el("div",{class:"row",style:"gap:6px;margin-top:3px"},posTag(p),el("span",{class:"note",text:r?`${r} ${r===1?"avaliação":"avaliações"}`:"sem avaliações"})))),
-      secLine(p.pr.sec),
+        el("div",{class:"meta"},el("div",{class:"pname",text:p.name+(p.id===me?" (você)":"")}),el("div",{class:"row",style:"gap:6px;margin-top:3px"},posTag(p),isOrg(p.id)?orgChip():null,el("span",{class:"note",text:r?`${r} ${r===1?"avaliação":"avaliações"}`:"sem avaliações"})))),
+      secLine(p.pr.sec),perfLine(p.id),
       ...ATTRS.map(([k,,code])=>statRow(k,code,p.pr.avg[k]))));
   }
 }
@@ -250,6 +278,7 @@ const dName=id=>getP(id).name+(isGuest(id)?" (convidado)":"");
 let present=new Set(ls("present")||[]);let presentInit=ls("present")!=null;
 function savePresent(){presentInit=true;ls("present",[...present])}
 function renderPick(){
+  $("drawTools").hidden=!S.isAdmin;if(!S.isAdmin){renderResult();return}
   const box=$("pick");box.replaceChildren();const ps=sortedPlayers();
   if(!presentInit&&ps.length)ps.forEach(p=>present.add(p.id));
   for(const id of [...present])if(!hasP(id))present.delete(id);
@@ -296,7 +325,8 @@ $("guestForm").addEventListener("submit",e=>{
 });
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
 function balance(ids,k){
-  const info=new Map(ids.map(id=>{const pr=rate(id);const v={ovr:pr.ovr??3};for(const [a] of ATTRS)v[a]=pr.avg[a]??v.ovr;const pl=getP(id);return [id,{...v,pos:posOf(pl),pos2:pr.sec.key}]}));
+  const usePerf=$("usePerf").checked;const adjMap=usePerf?perfAdj():new Map();
+  const info=new Map(ids.map(id=>{const pr=rate(id);const v={ovr:pr.ovr??3};for(const [a] of ATTRS)v[a]=pr.avg[a]??v.ovr;const pl=getP(id);const a=usePerf?(adjMap.get(id)||0):0;for(const k in v)v[k]+=a;return [id,{...v,pos:posOf(pl),pos2:pr.sec.key}]}));
   const able={};for(const ps of POS_KEYS)able[ps]=ids.filter(id=>info.get(id).pos===ps||info.get(id).pos2===ps).length>=k;
   const keys=["ovr",...ATTRS.map(a=>a[0])];
   const M={};for(const key of keys)M[key]=ids.reduce((s,id)=>s+info.get(id)[key],0)/ids.length;
@@ -340,10 +370,12 @@ function waText(teams,at,res){let s=`⚽ Times da pelada (${dateBR(at)})\n`;team
   return s.trim()}
 function renderResult(){
   const r=$("result");r.replaceChildren();
-  const d=S.draw||S.saved;if(!d)return;
+  const d=(S.isAdmin&&S.draw)||S.saved;
+  if(!d){if(!S.isAdmin)r.append(el("div",{class:"empty",style:"margin-top:24px"},el("strong",{text:"Sorteio ainda não publicado"}),"Quando os organizadores publicarem os times, eles aparecem aqui."));return}
   const teams=d.teams.map(t=>t.filter(id=>hasP(id)));const res=(d.res||[]).filter(id=>hasP(id));
-  r.append(el("h2",{text:S.draw?"Times sorteados":"Sorteio da semana"}));
-  if(!S.draw)r.append(el("p",{class:"lead",text:`Salvo pelo organizador em ${dateBR(d.at)}.`}));
+  r.append(el("h2",{text:S.draw?"Times sorteados":"Sorteio publicado"}));
+  if(S.draw)r.append(el("p",{class:"lead",text:"Prévia: só você está vendo. Toque em Publicar sorteio para mostrar ao grupo, ou sorteie de novo."}));
+  else r.append(el("p",{class:"lead",text:`Publicado pelos organizadores em ${dateBR(d.at)}.`}));
   const grid=el("div",{class:"teams"});
   teams.forEach((t,i)=>{const st=teamStats(t);
     grid.append(el("div",{class:"team",style:`--tc:var(${TEAMS[i][1]})`},
@@ -358,8 +390,8 @@ function renderResult(){
   acts.append(el("button",{class:"btn primary",type:"button",text:"Copiar para o WhatsApp",onclick:ev=>{const txt=waText(teams,d.at,res);box.value=txt;const b=ev.currentTarget;
     const ok=()=>{b.textContent="Copiado";setTimeout(()=>b.textContent="Copiar para o WhatsApp",1800)};const fb=()=>{box.hidden=false;box.select()};
     try{navigator.clipboard.writeText(txt).then(ok,fb)}catch(e){fb()}}}));
-  if(S.draw&&S.isAdmin)acts.append(el("button",{class:"btn",type:"button",text:"Salvar como sorteio da semana",onclick:async ev=>{const b=ev.currentTarget;b.disabled=true;
-    try{await S.db.doc("draws/latest").set({teams:Object.fromEntries(teams.map((t,i)=>["t"+i,t])),k:teams.length,res,guests:Object.fromEntries([...teams.flat(),...res].filter(isGuest).map(id=>{const g=getP(id);return [id,{name:g.name,pos:g.pos,lvl:+g.lvl||3}]})),at:d.at});b.textContent="Salvo para todos"}catch(e){b.disabled=false;status("Não foi possível salvar o sorteio.",true)}}}));
+  if(S.draw&&S.isAdmin)acts.append(el("button",{class:"btn",type:"button",text:"Publicar sorteio",onclick:async ev=>{const b=ev.currentTarget;b.disabled=true;
+    try{await S.db.doc("draws/latest").set({teams:Object.fromEntries(teams.map((t,i)=>["t"+i,t])),k:teams.length,res,guests:Object.fromEntries([...teams.flat(),...res].filter(isGuest).map(id=>{const g=getP(id);return [id,{name:g.name,pos:g.pos,lvl:+g.lvl||3}]})),at:d.at});b.textContent="Publicado para todos";status("Sorteio publicado. Todo o grupo já vê os times na aba Sorteio.")}catch(e){b.disabled=false;status(e.code==="permission-denied"?"Só organizadores podem publicar o sorteio.":"Não foi possível publicar o sorteio.",true)}}}));
   r.append(acts,box,el("p",{class:"note",style:"margin-top:8px",text:"O número ao lado do nome é a nota geral do perfil."}));
 }
 
@@ -390,7 +422,15 @@ function groupStatus(ps){
     out.set(p.id,{st:n>=need?"ok":"aval",n,need,u})}
   return out;
 }
+function renderNotesBox(){
+  const b=$("notesBox");if(!b)return;b.replaceChildren();
+  const lk=!!S.notes.locked;
+  b.append(el("p",{},el("b",{text:lk?"Notas travadas. ":"Notas liberadas. "}),lk?`Desde ${dateBR(S.notes.lockedAt||Date.now())}. Ninguém consegue mudar as notas que já deu, só completar as que faltam.`:`O grupo pode mudar as notas até a primeira partida do mês. Ela trava tudo sozinha quando você lança o primeiro jogo do mês.`),
+    confirmBtn(lk?"Abrir revisão de notas":"Travar notas agora",lk?"Toque de novo: todos poderão mudar as notas":"Toque de novo para travar",async()=>{
+      await S.db.doc("config/notes").set(lk?{locked:false,reviewAt:Date.now(),by:myPid()}:{locked:true,lockedAt:Date.now(),by:myPid()})},lk?"btn":"btn"));
+}
 function renderGrupo(){
+  renderNotesBox();
   const g=$("gtable");g.replaceChildren();const ps=sortedPlayers();const total=ps.length;
   const st=groupStatus(ps);const cnt={todos:total,nao:0,aval:0,ok:0};for(const x of st.values())cnt[x.st]++;
   $("gbar").replaceChildren(...total?[el("i",{style:`width:${100*cnt.ok/total}%;background:var(--pitch)`,title:"Avaliaram todos"}),el("i",{style:`width:${100*cnt.aval/total}%;background:var(--vest)`,title:"Faltam avaliar"})]:[]);
@@ -411,11 +451,15 @@ function renderGrupo(){
     if(x.st==="nao")chip=el("span",{class:"chip wait",text:"Não acessou"});
     else if(x.st==="aval")chip=el("span",{class:"chip go",text:`Avaliou ${x.n} de ${x.need}`});
     else chip=el("span",{class:"chip ok",text:"Avaliou todos"});
-    if(u&&u===S.uid&&S.isAdmin)chip=el("span",{class:"row",style:"gap:4px;justify-self:end"},el("span",{class:"chip ok",text:"Organizador"}),chip);
+    if(isOrg(p.id))chip=el("span",{class:"row",style:"gap:4px;justify-self:end"},orgChip(),chip);
     const acts=el("div",{class:"acts"});
     const sel=el("select",{"aria-label":"Posição de "+p.name},...POS_KEYS.map(k=>el("option",{value:k,text:POS[k][0]})));sel.value=posOf(p);
     sel.addEventListener("change",async()=>{try{await S.db.collection("players").doc(p.id).update({pos:sel.value})}catch(e){status("Não deu para mudar a posição.",true);sel.value=posOf(p)}});
     acts.append(sel);
+    if(ph&&p.id!==myPid()){const org=isOrg(p.id);
+      acts.append(confirmBtn(org?"Tirar de organizador":"Tornar organizador",org?"Toque de novo: "+p.name+" vira jogador":"Toque de novo: "+p.name+" poderá sortear e cadastrar",async()=>{
+        if(org){await S.db.collection("admins").doc(e164(ph)).delete();await S.db.collection("players").doc(p.id).update({role:"jogador"})}
+        else{await S.db.collection("admins").doc(e164(ph)).set({nome:p.name,pid:p.id});await S.db.collection("players").doc(p.id).update({role:"org"})}},org?"mini danger":"mini"))}
     if(u&&u!==S.uid)acts.append(confirmBtn("Zerar notas","Toque de novo: apaga as notas que "+p.name+" deu",async()=>{await S.db.collection("ratings").doc(p.id).delete()}));
     if(p.id!==myPid())acts.append(confirmBtn("Remover","Toque de novo para remover "+p.name,async()=>{if(ph)await S.db.collection("phoneIndex").doc(e164(ph)).delete();await S.db.collection("ratings").doc(p.id).delete();await S.db.collection("players").doc(p.id).delete()}));
     g.append(el("div",{class:"grow"},
@@ -423,6 +467,103 @@ function renderGrupo(){
       chip,acts));
   }
 }
+/* ---------- resultados ---------- */
+S.matches=[];S.notes={locked:false};S.savedMine={};let MF=null;
+{const u=ls("usePerf");if(u===false)$("usePerf").checked=false}
+$("usePerf").addEventListener("change",()=>ls("usePerf",$("usePerf").checked));
+function stats(){
+  const st=new Map();const get=id=>{if(!st.has(id))st.set(id,{j:0,v:0,e:0,d:0,g:0,pts:0});return st.get(id)};
+  for(const m of S.matches){
+    const sides=[[m.a,m.b],[m.b,m.a]];
+    for(const [me,op] of sides)for(const id of me.roster||[]){if(!S.players.has(id))continue;const x=get(id);x.j++;
+      if(me.goals>op.goals){x.v++;x.pts+=3}else if(me.goals===op.goals){x.e++;x.pts++}else x.d++}
+    for(const [id,n] of Object.entries(m.scorers||{}))if(S.players.has(id))get(id).g+=n;
+  }
+  return st;
+}
+/* Ajuste de força pelo desempenho: até meio ponto para cima ou para baixo, crescendo com o número de jogos. */
+function perfAdj(){
+  const st=stats();const xs=[...st.entries()].filter(([,x])=>x.j>0);const out=new Map();if(!xs.length)return out;
+  const avgP=xs.reduce((q,[,x])=>q+x.pts/x.j,0)/xs.length,avgG=xs.reduce((q,[,x])=>q+x.g/x.j,0)/xs.length;
+  for(const [id,x] of xs){const raw=((x.pts/x.j-avgP)*0.3+(x.g/x.j-avgG)*0.15)*(x.j/(x.j+3));out.set(id,Math.max(-0.5,Math.min(0.5,raw)))}
+  return out;
+}
+function perfLine(pid){const x=stats().get(pid);if(!x||!x.j)return null;
+  return el("div",{class:"perfline",text:`${x.j} ${x.j===1?"jogo":"jogos"} · ${x.v}V ${x.e}E ${x.d}D · ${x.g} ${x.g===1?"gol":"gols"}`})}
+const tName=i=>"Time "+TEAMS[i][0];
+function newMF(){const d=S.saved;if(!d||d.teams.length<2)return null;
+  return {a:0,b:1,extraA:[],extraB:[],g:{},ownA:0,ownB:0,drawAt:d.at}}
+function rosterOf(side){const d=S.saved;const i=side==="A"?MF.a:MF.b;return [...(d.teams[i]||[]),...(side==="A"?MF.extraA:MF.extraB)].filter(hasP)}
+function sideGoals(side){return rosterOf(side).reduce((q,id)=>q+(MF.g[id]||0),0)+(side==="A"?MF.ownA:MF.ownB)}
+function stepper(val,onChange,label){
+  const out=el("output",{text:String(val)});
+  return el("span",{class:"step"},el("button",{type:"button","aria-label":"Tirar gol de "+label,text:"−",onclick:()=>onChange(Math.max(0,val-1))}),out,
+    el("button",{type:"button","aria-label":"Somar gol para "+label,text:"+",onclick:()=>onChange(val+1)}))}
+function renderMatchForm(){
+  const box=$("matchForm");box.replaceChildren();if(!S.isAdmin)return;
+  box.append(el("h2",{text:"Lançar jogo"}));
+  if(!S.saved){box.append(el("p",{class:"lead",text:"Publique um sorteio na aba Sorteio para lançar os resultados com aqueles times."}));return}
+  if(!MF||MF.drawAt!==S.saved.at)MF=newMF();if(!MF)return;
+  const n=S.saved.teams.length;
+  const sel=(v,on)=>{const s=el("select",{},...Array.from({length:n},(_,i)=>el("option",{value:i,text:tName(i)})));s.value=v;s.addEventListener("change",()=>on(+s.value));return s};
+  const err=el("div",{class:"err-text"});
+  const f=el("div",{class:"mform"},el("div",{class:"vs"},sel(MF.a,v=>{MF.a=v;MF.extraA=[];renderMatchForm()}),el("b",{text:"x"}),sel(MF.b,v=>{MF.b=v;MF.extraB=[];renderMatchForm()}),
+    el("span",{class:"note",text:`Times do sorteio de ${dateBR(S.saved.at)}`})));
+  const teams=el("div",{class:"mteams"});
+  for(const side of ["A","B"]){
+    const idx=side==="A"?MF.a:MF.b;const rs=rosterOf(side);
+    const panel=el("div",{class:"mteam",style:`--tc:var(${TEAMS[idx][1]})`},el("div",{class:"hd"},el("h3",{text:tName(idx)}),el("span",{class:"score",text:String(sideGoals(side))})));
+    for(const id of rs)panel.append(el("div",{class:"grow2"},el("span",{text:dName(id)}),stepper(MF.g[id]||0,v=>{MF.g[id]=v;renderMatchForm()},getP(id).name)));
+    const own=side==="A"?MF.ownA:MF.ownB;
+    panel.append(el("div",{class:"grow2"},el("span",{class:"note",text:"Gol contra / sem autor"}),stepper(own,v=>{side==="A"?MF.ownA=v:MF.ownB=v;renderMatchForm()},"gol sem autor")));
+    const used=new Set([...rosterOf("A"),...rosterOf("B")]);
+    const opts=[...(S.saved.res||[]),...S.saved.teams.flat()].filter(id=>hasP(id)&&!used.has(id));
+    if(opts.length){const add=el("select",{"aria-label":"Adicionar jogador ao "+tName(idx)},el("option",{value:"",text:"+ Entrou alguém de fora do time?"}),...opts.map(id=>el("option",{value:id,text:dName(id)})));
+      add.addEventListener("change",()=>{if(!add.value)return;(side==="A"?MF.extraA:MF.extraB).push(add.value);renderMatchForm()});panel.append(add)}
+    teams.append(panel);
+  }
+  const save=el("button",{class:"btn primary big",type:"button",style:"margin-top:12px",text:"Salvar jogo",onclick:async()=>{
+    err.textContent="";if(MF.a===MF.b){err.textContent="Escolha dois times diferentes.";return}
+    const rA=rosterOf("A"),rB=rosterOf("B");const scorers={};for(const id of [...rA,...rB])if(MF.g[id])scorers[id]=MF.g[id];
+    const names={};for(const id of [...rA,...rB])names[id]=getP(id).name;
+    save.disabled=true;
+    const firstOfMonth=!S.matches.some(m=>sameMonth(m.at,Date.now()));
+    try{if(firstOfMonth&&!S.notes.locked)await S.db.doc("config/notes").set({locked:true,lockedAt:Date.now(),by:myPid()});
+      await S.db.collection("matches").add({at:Date.now(),drawAt:S.saved.at,a:{team:MF.a,roster:rA,goals:sideGoals("A"),own:MF.ownA},b:{team:MF.b,roster:rB,goals:sideGoals("B"),own:MF.ownB},scorers,names});
+      const keep={a:MF.a,b:MF.b};MF=newMF();MF.a=keep.a;MF.b=keep.b;status("Jogo salvo.");renderMatchForm()}
+    catch(e){console.error(e);save.disabled=false;err.textContent=e.code==="permission-denied"?"Só organizadores lançam resultados. Confira se as regras novas do Firestore foram publicadas.":"Não deu para salvar o jogo. Tente de novo."}}});
+  f.append(teams,save,err);box.append(f);
+}
+function renderResultados(){
+  renderMatchForm();
+  const st=stats();const rows=[...st.entries()].filter(([,x])=>x.j>0).map(([id,x])=>({id,...x,name:S.players.get(id).name}));
+  const top=$("topScorers");top.replaceChildren();
+  const sc=rows.filter(r=>r.g>0).sort((a,b)=>b.g-a.g||a.j-b.j||a.name.localeCompare(b.name,"pt-BR")).slice(0,10);
+  if(!sc.length)top.append(el("div",{class:"empty",style:"margin-top:10px"},el("strong",{text:"Nenhum gol lançado"}),"Os artilheiros aparecem aqui quando os organizadores lançarem os jogos."));
+  else top.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},...["Jogador","Gols","Jogos","Média"].map(t=>el("th",{text:t})))),
+    el("tbody",{},...sc.map((r,i)=>el("tr",{},el("td",{},el("span",{class:"n",text:i+1+"º "}),r.name),el("td",{text:String(r.g)}),el("td",{text:String(r.j)}),el("td",{text:fmt(r.g/r.j)})))))));
+  const pt=$("perfTable");pt.replaceChildren();
+  if(!rows.length)pt.append(el("div",{class:"empty",style:"margin-top:10px"},el("strong",{text:"Sem jogos ainda"}),"Vitórias, empates e derrotas de cada um aparecem aqui."));
+  else{const adj=perfAdj();rows.sort((a,b)=>b.pts-a.pts||b.v-a.v||b.g-a.g||a.name.localeCompare(b.name,"pt-BR"));
+    pt.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},...["Jogador","J","V","E","D","Gols","Pts","Ajuste"].map(t=>el("th",{text:t,title:t==="Ajuste"?"Quanto o desempenho soma ou tira da nota geral no sorteio":""})))),
+      el("tbody",{},...rows.map(r=>{const a=adj.get(r.id)||0;return el("tr",{},el("td",{text:r.name}),...[r.j,r.v,r.e,r.d,r.g,r.pts].map(v=>el("td",{text:String(v)})),el("td",{class:"n",text:(a>=0?"+":"−")+Math.abs(a).toFixed(2).replace(".",",")}))})))))}
+  const ml=$("matchList");ml.replaceChildren();
+  if(!S.matches.length){ml.append(el("div",{class:"empty"},el("strong",{text:"Nenhum jogo lançado"}),S.isAdmin?"Lance o primeiro jogo no formulário acima.":"Os jogos aparecem aqui quando os organizadores lançarem."));return}
+  let day="";
+  for(const m of S.matches){
+    const dk=dateBR(m.at);if(dk!==day){day=dk;ml.append(el("div",{class:"mday",text:new Date(m.at).toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit"})}))}
+    const nm=id=>m.names?.[id]||getP(id)?.name||"?";
+    const goalsTxt=side=>{const s=m[side];const parts=(s.roster||[]).filter(id=>m.scorers?.[id]).map(id=>nm(id)+(m.scorers[id]>1?` (${m.scorers[id]})`:""));if(s.own)parts.push(`${s.own} sem autor`);return parts.join(", ")};
+    const card=el("div",{class:"mcard"},el("div",{class:"mline"},
+      el("span",{class:"dot",style:`--tc:var(${TEAMS[m.a.team][1]})`}),TEAMS[m.a.team][0],el("span",{class:"sc",text:`${m.a.goals} x ${m.b.goals}`}),TEAMS[m.b.team][0],el("span",{class:"dot",style:`--tc:var(${TEAMS[m.b.team][1]})`})));
+    const ga=goalsTxt("a"),gb=goalsTxt("b");
+    if(ga)card.append(el("div",{class:"who",text:`${TEAMS[m.a.team][0]}: ${ga}`}));
+    if(gb)card.append(el("div",{class:"who",text:`${TEAMS[m.b.team][0]}: ${gb}`}));
+    if(S.isAdmin)card.append(el("div",{class:"acts"},confirmBtn("Apagar jogo","Toque de novo para apagar",async()=>{await S.db.collection("matches").doc(m.id).delete()})));
+    ml.append(card);
+  }
+}
+
 /* ---------- importar cadastro (organizador) ---------- */
 $("importBtn").addEventListener("click",async()=>{
   const msg=$("importMsg"),btn=$("importBtn");const f=$("importFile").files[0];
@@ -459,20 +600,22 @@ $("importBtn").addEventListener("click",async()=>{
   }catch(x){console.error(x);msg.textContent=(x.code==="permission-denied"?"O Firebase recusou: só organizadores importam.":"A importação parou no meio. Rode de novo: quem já entrou não é duplicado.")+` (${created} importados até aqui)`}
   finally{btn.disabled=false}
 });
-function confirmBtn(label,confirmLabel,fn){
-  const b=el("button",{class:"mini danger",type:"button",text:label});
+function confirmBtn(label,confirmLabel,fn,cls){
+  const b=el("button",{class:cls||"mini danger",type:"button",text:label});
   b.addEventListener("click",async()=>{if(b.dataset.c!=="1"){b.dataset.c="1";b.textContent=confirmLabel;setTimeout(()=>{b.dataset.c="";b.textContent=label},4000);return}
     b.disabled=true;try{await fn()}catch(e){status("Não deu para concluir. Tente de novo.",true);b.disabled=false}});
   return b;
 }
 
 /* ---------- render ---------- */
-function render(){if(!renderShell())return renderLogin();if(tab==="avaliar")renderAvaliar();else if(tab==="perfis")renderCards();else if(tab==="sorteio")renderPick();else renderGrupo()}
+function render(){if(!renderShell())return renderLogin();if(tab==="avaliar")renderAvaliar();else if(tab==="perfis")renderCards();else if(tab==="resultados")renderResultados();else if(tab==="sorteio")renderPick();else renderGrupo()}
 
 /* ---------- início ---------- */
 let unsubs=[];
 function stopData(){unsubs.forEach(u=>{try{u()}catch(e){}});unsubs=[]}
 function enterAs(pid){S.uid=pid;S.claims.set(pid,pid);S.obIdx=null;S.obDone=false;
+  /* o perfil mostra quem é organizador */
+  const want=S.isAdmin?"org":null;if(want&&S.players.get(pid)?.role!==want)S.db.collection("players").doc(pid).update({role:want}).catch(e=>console.error(e));
   /* marca o primeiro acesso: o documento de notas existe a partir daqui */
   if(!S.ratings.has(pid))S.db.collection("ratings").doc(pid).set({scores:S.mine||{},raterPid:pid,updatedAt:Date.now()}).catch(e=>console.error(e));}
 function startData(){
@@ -484,11 +627,14 @@ function startData(){
   unsubs.push(S.db.collection("ratings").onSnapshot(s=>{
     S.ratings=new Map(s.docs.map(d=>{const x=d.data();return [d.id,{scores:x.scores||{},raterPid:x.raterPid}]}));
     S.claims=new Map(s.docs.map(d=>[d.id,d.id]));if(S.uid)S.claims.set(S.uid,S.uid);
-    if(S.uid&&!S.dirty)S.mine=JSON.parse(JSON.stringify(S.ratings.get(S.uid)?.scores||{}));ready("ratings")},fail));
+    if(S.uid){S.savedMine=JSON.parse(JSON.stringify(S.ratings.get(S.uid)?.scores||{}));if(!S.dirty)S.mine=JSON.parse(JSON.stringify(S.savedMine))}ready("ratings")},fail));
+  unsubs.push(S.db.doc("config/notes").onSnapshot(d=>{S.notes=d.exists?d.data():{locked:false};if(tab==="avaliar"&&!S.dirty)render();else if(tab==="grupo")renderNotesBox()},fail));
+  unsubs.push(S.db.collection("matches").onSnapshot(s=>{S.matches=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.at-a.at);if(tab==="resultados"||tab==="perfis")render()},fail));
   unsubs.push(S.db.doc("draws/latest").onSnapshot(d=>{if(d.exists){const x=d.data();const teams=[];for(let i=0;i<(x.k||0);i++)teams.push(x.teams["t"+i]||[]);S.savedGuests=x.guests||{};S.saved={teams,res:x.res||[],at:x.at}}else S.saved=null;if(tab==="sorteio")renderResult()},fail));
+  if(S.isAdmin)unsubs.push(S.db.collection("admins").onSnapshot(s=>{S.adminPhones=new Set(s.docs.map(d=>d.id));if(tab==="grupo")renderGrupo()},fail));
   if(S.isAdmin)unsubs.push(S.db.collection("phoneIndex").onSnapshot(s=>{S.phones=new Map(s.docs.map(d=>[d.data().pid,digitsOf(d.id)]));if(tab==="grupo")renderGrupo()},fail));
 }
-function resetState(){stopData();S.uid=null;S.isAdmin=S.isOwner=false;S.loaded=false;S.players=new Map();S.ratings=new Map();S.claims=new Map();S.phones=new Map();S.mine={};S.saved=null;S.draw=null}
+function resetState(){stopData();S.uid=null;S.isAdmin=S.isOwner=false;S.loaded=false;S.players=new Map();S.ratings=new Map();S.claims=new Map();S.phones=new Map();S.adminPhones=null;S.mine={};S.savedMine={};S.notes={locked:false};S.dirty=false;S.saved=null;S.draw=null;S.matches=[];MF=null}
 /* Lê o vínculo deste aparelho (claims/<uid>) e decide para onde ir. */
 async function boot(){
   resetState();status("");setStep("loading");

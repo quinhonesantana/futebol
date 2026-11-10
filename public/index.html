@@ -187,6 +187,48 @@ input[type=text],input[type=tel],select{font:inherit;color:var(--fg);background:
 .tip:focus{outline:none}
 .tip:focus-visible{outline:2px solid var(--vest);outline-offset:2px;border-radius:2px}
 .tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;bottom:calc(100% + 6px);z-index:20;background:var(--fg);color:var(--bg);font:500 12px/1.35 var(--body);letter-spacing:0;text-transform:none;text-align:left;padding:6px 9px;border-radius:6px;width:max-content;max-width:220px;white-space:normal;box-shadow:0 4px 14px rgb(0 0 0 / .18);pointer-events:none}
+.chip.org{background:var(--vest);color:var(--vest-ink)}
+.mform{margin-top:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px}
+.mform .vs{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mform .vs b{font:800 18px var(--display)}
+.mteams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+@media (max-width:560px){.mteams{grid-template-columns:1fr}}
+.mteam{border:1px solid var(--line);border-top:6px solid var(--tc);border-radius:10px;padding:10px 12px;min-width:0}
+.mteam .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.mteam h3{margin:0;font:800 20px var(--display);text-transform:uppercase}
+.mteam .score{font:800 40px/1 var(--display);font-variant-numeric:tabular-nums}
+.grow2{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--line)}
+.grow2 > span:first-child{flex:1;min-width:0;overflow-wrap:anywhere}
+.step{display:flex;align-items:center;gap:4px}
+.step button{width:30px;height:30px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:700 16px var(--body);cursor:pointer;padding:0}
+.step output{min-width:20px;text-align:center;font:700 16px var(--display);font-variant-numeric:tabular-nums}
+.mteam select{margin-top:8px;width:100%}
+.mlist{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.mday{font:700 13px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:8px}
+.mcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.mline{display:flex;align-items:center;gap:10px;font:800 20px var(--display);text-transform:uppercase}
+.mline .sc{font-variant-numeric:tabular-nums}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--tc);flex:none}
+.mcard .who{font-size:13px;color:var(--muted);margin-top:4px}
+.mcard .acts{display:flex;justify-content:flex-end}
+.tbl{overflow-x:auto;margin-top:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.tbl table{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+.tbl th,.tbl td{padding:8px 10px;text-align:right;border-top:1px solid var(--line);white-space:nowrap}
+.tbl th{border-top:0;font:700 13px var(--display);letter-spacing:.06em;color:var(--muted)}
+.tbl td:first-child,.tbl th:first-child{text-align:left}
+.tbl td.n{color:var(--muted)}
+@media (max-width:480px){.tbl table{font-size:13px}.tbl th,.tbl td{padding:7px 5px}.tbl th:first-child,.tbl td:first-child{padding-left:10px}.tbl th:last-child,.tbl td:last-child{padding-right:10px}}
+.perfline{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.savebar{position:sticky;bottom:0;z-index:4;margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));box-shadow:0 -6px 18px rgb(0 0 0 / .08)}
+.savebar .saveState{min-height:0;flex:1 1 180px}
+.savebar.dirty{border-color:var(--vest)}
+.savebar.dirty .saveState{color:var(--fg);font-weight:600}
+.lockinfo{margin:8px 0 0;padding:10px 12px;border-radius:8px;background:var(--chalk);font-size:14px}
+.lockinfo.on{background:color-mix(in srgb,var(--vest) 25%,transparent)}
+.chip.lock{background:var(--chalk);color:var(--muted)}
+.rate.locked .dots button{opacity:.55;cursor:not-allowed}
+.notesbox{margin-top:16px;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.notesbox p{margin:0;font-size:14px;flex:1 1 220px}
 .import{margin-top:18px;border:1px dashed var(--line);border-radius:10px;padding:10px 12px}
 .import summary{cursor:pointer;font:700 15px var(--display);text-transform:uppercase;letter-spacing:.04em}
 .import .row{margin-top:8px}
@@ -200,6 +242,7 @@ input[type=text],input[type=tel],select{font:inherit;color:var(--fg);background:
     <button role="tab" id="tab-avaliar" data-tab="avaliar">Avaliar</button>
     <button role="tab" id="tab-perfis" data-tab="perfis">Perfis</button>
     <button role="tab" id="tab-sorteio" data-tab="sorteio">Sorteio</button>
+    <button role="tab" id="tab-resultados" data-tab="resultados">Resultados</button>
     <button role="tab" id="tab-grupo" data-tab="grupo" hidden>Grupo</button>
   </nav>
 </div></header>
@@ -214,6 +257,7 @@ input[type=text],input[type=tel],select{font:inherit;color:var(--fg);background:
     <div class="cards" id="cards"></div>
   </section>
   <section id="v-sorteio" hidden>
+    <div id="drawTools">
     <h2>Quem veio hoje</h2>
     <p class="lead">Marque os presentes na ordem em que chegaram, defina quantos times e quantos titulares por time, e sorteie. Quem passar do número de titulares fica como reserva, na ordem de chegada. Zagueiros, meios e atacantes são divididos por igual entre os times. Quando uma posição não fecha certinho, o time com menos jogadores dela recebe alguém que o grupo votou como 2ª posição ali. As médias ficam o mais parecidas possível. Cada sorteio sai diferente.</p>
     <div class="row"><button class="btn" id="allBtn" type="button">Marcar todos</button><button class="btn" id="noneBtn" type="button">Desmarcar todos</button><span class="note" id="presentCount"></span></div>
@@ -229,15 +273,28 @@ input[type=text],input[type=tel],select{font:inherit;color:var(--fg);background:
     <div class="controls">
       <label for="nTeams">Times <select id="nTeams"><option>2</option><option>3</option><option>4</option></select></label>
       <label for="perTeam">Titulares por time <select id="perTeam"><option>3</option><option>4</option><option selected>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option></select></label>
+      <label for="usePerf" title="Ajusta a força de cada jogador pelos resultados lançados (vitórias, derrotas e gols)"><input type="checkbox" id="usePerf" checked> Usar resultados dos jogos</label>
       <button class="btn vest" id="drawBtn" type="button">Sortear</button>
       <span class="note" id="drawHint"></span>
     </div>
+    </div>
     <div id="result"></div>
+  </section>
+  <section id="v-resultados" hidden>
+    <div id="matchForm"></div>
+    <h2>Artilharia</h2>
+    <div id="topScorers"></div>
+    <h2>Desempenho</h2>
+    <p class="lead">Vitória vale 3 pontos e empate 1. Com a opção ligada no sorteio, quem vem ganhando conta um pouco mais forte e quem vem perdendo um pouco mais fraco.</p>
+    <div id="perfTable"></div>
+    <h2>Jogos</h2>
+    <div class="mlist" id="matchList"></div>
   </section>
   <section id="v-grupo" hidden>
     <h2>Jogadores do grupo</h2>
     <p class="lead">Cadastre cada jogador com nome, celular e posição principal. A posição secundária sai da votação do grupo na avaliação. Ele entra no app digitando o próprio celular e, no primeiro acesso, avalia todo o grupo antes de ver perfis e sorteio. O celular só aparece para organizadores.</p>
-    <form class="addbox" id="addForm" autocomplete="off">
+    <div class="notesbox" id="notesBox"></div>
+    <form class="addbox" id="addForm" autocomplete="off" style="margin-top:14px">
       <input type="text" id="newName" placeholder="Nome" maxlength="40" aria-label="Nome do jogador">
       <input type="tel" id="newPhone" placeholder="(11) 98765-4321" inputmode="tel" maxlength="20" aria-label="Celular">
       <select id="newPos" aria-label="Posição"><option value="" disabled selected>Posição</option><option value="zag">Zagueiro</option><option value="mei">Meio</option><option value="ata">Atacante</option></select>

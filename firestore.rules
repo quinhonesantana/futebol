@@ -12,10 +12,13 @@ service cloud.firestore {
     function myPid() { return claim().pid; }
     function idxPath(phone) { return /databases/$(database)/documents/phoneIndex/$(phone); }
 
-    // Lista de organizadores: criada à mão no Console. Só dá para consultar um número específico.
+    // Organizadores. Todo aparelho consulta um número específico; organizadores listam,
+    // adicionam e removem outros organizadores (ninguém remove a si mesmo).
     match /admins/{phone} {
       allow get: if signed();
-      allow list, write: if false;
+      allow list, create: if isAdmin();
+      allow delete: if isAdmin() && phone != claim().phone;
+      allow update: if false;
     }
 
     // Celular -> jogador. Qualquer aparelho consulta um número; só organizador lista e altera.
@@ -49,6 +52,18 @@ service cloud.firestore {
       allow create, update: if hasClaim() && myPid() == pid
         && request.resource.data.keys().hasOnly(['scores', 'raterPid', 'updatedAt']);
       allow delete: if isAdmin() || (hasClaim() && myPid() == pid);
+    }
+
+    // Resultados dos jogos: todos leem, só organizadores lançam e apagam.
+    match /matches/{id} {
+      allow read: if hasClaim();
+      allow write: if isAdmin();
+    }
+
+    // Configurações do grupo (ex.: notas travadas ou em revisão).
+    match /config/{id} {
+      allow read: if hasClaim();
+      allow write: if isAdmin();
     }
 
     match /draws/{id} {

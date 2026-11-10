@@ -1,7 +1,7 @@
 # Sorteio da Pelada
 
 App web para o futebol semanal do grupo:
-- **Avaliação:** cada jogador avalia todo o grupo em cinco atributos (Defesa, Passe, Ataque, Resistência e Velocidade, de 1 a 5) e vota na posição secundária ideal de cada um.
+- **Avaliação:** cada jogador avalia todo o grupo em cinco atributos (Defesa, Passe, Ataque, Resistência e Velocidade, de 1 a 5) e, se quiser, vota na posição secundária ideal de cada um (opcional).
 - **Perfis:** as médias de todas as avaliações viram o perfil de cada jogador.
 - **Sorteio:** o app monta times equilibrados por posição (zagueiro, meio, atacante) e por nota. Você define quantos times e quantos titulares por time, e quem sobra fica de reserva. Também dá para incluir convidados.
 
@@ -46,7 +46,7 @@ No Firestore, aba **Dados**, clique em **Iniciar coleção**:
 - **ID do documento:** seu celular no formato `+55` + DDD + número, só com números. Exemplo: `+5511987654321`.
 - **Campo:** `nome`, do tipo string, com o seu nome.
 
-Para ter outro organizador, crie mais um documento em `admins` com o celular dele.
+Os outros organizadores você define pelo próprio app: na aba **Grupo**, use **Tornar organizador** ao lado do jogador.
 
 ### Parte 2: Netlify (o site)
 
@@ -66,6 +66,24 @@ Firebase → **Authentication** → **Configurações** → **Domínios autoriza
 2. O app pede seu nome e sua posição. Você entra direto na aba **Grupo**.
 3. Cadastre os jogadores com nome, celular e posição.
 4. Mande o link no grupo do WhatsApp. Cada um entra digitando o próprio celular.
+
+## Perfis de acesso
+
+| | Organizador | Jogador |
+|---|---|---|
+| Avaliar e ver perfis | Sim | Sim (depois de avaliar todo o grupo) |
+| Sortear e publicar os times | Sim | Não: só vê o sorteio publicado |
+| Lançar e apagar resultados dos jogos | Sim | Não: vê jogos, artilharia e desempenho |
+| Cadastrar, importar e remover jogadores | Sim | Não |
+| Ver celulares | Sim | Não |
+| Tornar ou tirar organizador | Sim (menos a si mesmo) | Não |
+
+O sorteio feito por um organizador fica só na tela dele, como prévia, até ele tocar em **Publicar sorteio**.
+
+## Quando as notas travam
+- **Até a primeira partida do mês:** cada jogador pode mudar as próprias notas à vontade. As notas só são gravadas quando ele toca em **Salvar notas**, no fim da página. No primeiro acesso, cada jogador é salvo ao tocar em **Próximo**.
+- **No primeiro jogo do mês:** quando um organizador lança esse jogo na aba Resultados, as notas que já foram dadas travam. Notas de jogadores que a pessoa ainda não avaliou continuam liberadas, para quem entrou depois.
+- **Revisão:** o presidente (organizador) libera as notas em **Grupo → Abrir revisão de notas**. Elas voltam a travar no primeiro jogo do mês seguinte, ou antes, se ele tocar em **Travar notas agora**.
 
 ## Importar um cadastro
 Na aba **Grupo**, um organizador logado abre **Importar cadastro**, escolhe o arquivo `.json` e clica em **Importar**:
