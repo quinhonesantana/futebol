@@ -5,7 +5,7 @@
 
 App web para o futebol semanal do grupo:
 - **Avaliação:** cada jogador avalia todo o grupo em cinco atributos (Defesa, Passe, Ataque, Resistência e Velocidade, de 1 a 5) e, se quiser, vota na posição secundária ideal de cada um (opcional).
-- **Perfis:** as médias de todas as avaliações viram o perfil de cada jogador.
+- **Jogadores:** as médias de todas as avaliações viram o perfil de cada jogador.
 - **Sorteio:** o app monta times equilibrados por posição (zagueiro, meio, atacante) e por nota. Você define quantos times e quantos titulares por time, e quem sobra fica de reserva. Também dá para incluir convidados.
 
 **Tecnologias:** HTML, CSS e JavaScript puros, sem etapa de build. O site é hospedado no Netlify; os dados ficam no Firebase (Firestore e login anônimo pelo celular).
@@ -82,7 +82,7 @@ Firebase → **Authentication** → **Configurações** → **Domínios autoriza
 | Tornar ou tirar organizador | Sim (menos a si mesmo) | Não |
 | Resetar as notas de todo o grupo | Sim (Grupo → Resetar todas as notas) | Não |
 
-**Visitantes** (quem abre o link sem entrar) veem, na tela de login, os perfis com as médias e a aba de resultados. Eles não veem o sorteio, os celulares nem quem deu qual nota. O resumo dos perfis é atualizado sozinho sempre que um organizador está com o app aberto.
+**Visitantes** (quem abre o link sem entrar) veem, na tela inicial, as abas Jogadores (perfis com as médias) e Resultados. Eles não veem o sorteio, os celulares nem quem deu qual nota. O resumo dos perfis é atualizado sozinho sempre que um organizador está com o app aberto.
 
 O sorteio feito por um organizador fica só na tela dele, como prévia, até ele tocar em **Publicar sorteio**.
 

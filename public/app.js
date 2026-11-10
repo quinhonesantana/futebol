@@ -114,8 +114,8 @@ function renderLogin(){
       el("ol",{class:"steps"},
         el("li",{},el("b",{text:"1"}),"Você avalia cada jogador do grupo, um por vez."),
         el("li",{},el("b",{text:"2"}),"Suas notas entram na média e formam o perfil de cada um."),
-        el("li",{},el("b",{text:"3"}),"Aí liberam os perfis e o sorteio dos times.")),
-      el("p",{class:"note",style:"margin:14px 0 0",text:"Depois de entrar uma vez, este aparelho já abre direto no seu cadastro. Visitante? Veja os perfis e os resultados nas abas acima."}));
+        el("li",{},el("b",{text:"3"}),"Aí liberam as abas Jogadores e Sorteio.")),
+      el("p",{class:"note",style:"margin:14px 0 0",text:"Depois de entrar uma vez, este aparelho já abre direto no seu cadastro. Visitante? Veja os jogadores e os resultados nas abas acima."}));
     form.addEventListener("submit",async e=>{e.preventDefault();err.textContent="";
       const d=normPhone(inp.value);if(!d){err.textContent="Digite o celular com DDD, por exemplo (11) 98765-4321.";return}
       btn.disabled=true;
@@ -167,7 +167,7 @@ function renderOnboard(v,os){
   const done=os.filter(x=>full(S.mine[x.id])).length;
   const first=done===0&&S.obIdx===0;
   v.append(el("h2",{text:first?"Primeiro, avalie o grupo":"Avalie o grupo"}),
-    el("p",{class:"lead",text:"Perfis e sorteio liberam quando você der nota para todos. Cada jogador é salvo quando você toca em Próximo. Seja justo: a média de todo mundo é que monta os times."}),
+    el("p",{class:"lead",text:"As abas Jogadores e Sorteio liberam quando você der nota para todos. Cada jogador é salvo quando você toca em Próximo. Seja justo: a média de todo mundo é que monta os times."}),
     el("div",{class:"prog"},el("span",{text:`${done} de ${os.length} avaliados`}),el("div",{class:"bar"},el("i",{style:`width:${100*done/os.length}%`}))));
   const card=el("div",{class:"ob"},el("div",{class:"count",text:`Jogador ${S.obIdx+1} de ${os.length}`}),
     el("div",{class:"name"},youName(p),posTag(p,false,true)));
@@ -184,7 +184,7 @@ function renderOnboard(v,os){
     el("button",{class:"btn primary big",type:"button",disabled:!full(m),text:isLastPending&&full(m)?"Concluir":"Próximo",onclick:async ev=>{
       const bt=ev.currentTarget;bt.disabled=true;if(!await flushSave()){bt.disabled=false;return}
       const rest=pending();
-      if(!rest.length){S.obDone=true;S.obIdx=null;status("Pronto! Você avaliou todo o grupo. Perfis e sorteio liberados. "+lockText());setTab("perfis");return}
+      if(!rest.length){S.obDone=true;S.obIdx=null;status("Pronto! Você avaliou todo o grupo. As abas Jogadores e Sorteio estão liberadas. "+lockText());setTab("perfis");return}
       const after=os.findIndex((x,i)=>i>S.obIdx&&!full(S.mine[x.id]));S.obIdx=after>=0?after:os.findIndex(x=>!full(S.mine[x.id]));render();window.scrollTo({top:0})}})));
   v.append(card,el("div",{class:"saveState",id:"saveState",text:saveMsg}));
 }
@@ -267,7 +267,7 @@ function secLine(sec){
 function renderCards(){
   const c=$("cards");c.replaceChildren();
   const ps=sortedPlayers().map(p=>({...p,pr:profile(p.id)})).sort((a,b)=>(b.pr.ovr??-1)-(a.pr.ovr??-1)||a.name.localeCompare(b.name,"pt-BR"));
-  if(!ps.length){c.append(el("div",{class:"empty",style:"grid-column:1/-1"},el("strong",{text:"Sem perfis ainda"}),"Os perfis aparecem quando houver jogadores cadastrados e notas."));return}
+  if(!ps.length){c.append(el("div",{class:"empty",style:"grid-column:1/-1"},el("strong",{text:"Nenhum jogador ainda"}),"Os jogadores aparecem aqui quando o organizador cadastrar o grupo."));return}
   const me=myPid();
   for(const p of ps){const r=p.pr.raters;
     c.append(el("div",{class:"card"},
