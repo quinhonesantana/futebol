@@ -71,13 +71,21 @@ function profile(pid){
 /* ---------- abas ---------- */
 let tab=ls("tab")||"avaliar";
 function setTab(t){tab=t;ls("tab",t);render()}
-document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>setTab(b.dataset.tab)));
+let vtab=ls("vtab")||"entrar";
+document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>{if(!myPid()){vtab=b.dataset.tab;ls("vtab",vtab);render();window.scrollTo({top:0});return}setTab(b.dataset.tab)}));
 const VIEWS=["avaliar","perfis","sorteio","resultados","grupo"];
 function renderShell(){
   const me=myPid(),g=gated();
   $("tabs").hidden=!me;$("v-login").hidden=!!me;$("loginLogo").hidden=!!me;
-  if(!me){for(const v of VIEWS)$("v-"+v).hidden=!(S.visitor&&(v==="perfis"||v==="resultados"));$("visitorHead").hidden=!S.visitor;$("who").textContent="";return false}
-  $("visitorHead").hidden=true;
+  if(!me){
+    /* visitante: abas Entrar, Perfis e Resultados */
+    const vis=S.visitor;if(!vis||!["entrar","perfis","resultados"].includes(vtab))vtab="entrar";
+    $("tabs").hidden=!vis;
+    for(const b of document.querySelectorAll("#tabs button")){const t=b.dataset.tab;b.hidden=!(t==="entrar"||t==="perfis"||t==="resultados");b.disabled=false;b.title="";b.setAttribute("aria-selected",String(t===vtab))}
+    $("v-login").hidden=vtab!=="entrar";$("loginLogo").hidden=vtab!=="entrar";
+    for(const v of VIEWS)$("v-"+v).hidden=!(vis&&v===vtab);
+    $("visitorHead").hidden=!(vis&&vtab!=="entrar");$("who").textContent="";return false}
+  $("visitorHead").hidden=true;$("tab-entrar").hidden=true;for(const t of ["avaliar","perfis","sorteio","resultados"])$("tab-"+t).hidden=false;
   $("tab-grupo").hidden=!S.isAdmin;
   for(const t of ["perfis","sorteio","resultados"]){$("tab-"+t).disabled=g;$("tab-"+t).title=g?"Libera depois que você avaliar todo o grupo":""}
   if((tab==="perfis"||tab==="sorteio"||tab==="resultados")&&g)tab="avaliar";
@@ -107,7 +115,7 @@ function renderLogin(){
         el("li",{},el("b",{text:"1"}),"Você avalia cada jogador do grupo, um por vez."),
         el("li",{},el("b",{text:"2"}),"Suas notas entram na média e formam o perfil de cada um."),
         el("li",{},el("b",{text:"3"}),"Aí liberam os perfis e o sorteio dos times.")),
-      el("p",{class:"note",style:"margin:14px 0 0",text:"Depois de entrar uma vez, este aparelho já abre direto no seu cadastro. Visitante? Role a página para ver os perfis e os resultados."}));
+      el("p",{class:"note",style:"margin:14px 0 0",text:"Depois de entrar uma vez, este aparelho já abre direto no seu cadastro. Visitante? Veja os perfis e os resultados nas abas acima."}));
     form.addEventListener("submit",async e=>{e.preventDefault();err.textContent="";
       const d=normPhone(inp.value);if(!d){err.textContent="Digite o celular com DDD, por exemplo (11) 98765-4321.";return}
       btn.disabled=true;
@@ -622,7 +630,7 @@ function confirmBtn(label,confirmLabel,fn,cls){
 }
 
 /* ---------- render ---------- */
-function render(){if(!renderShell()){renderLogin();if(S.visitor){renderCards();renderResultados()}return}if(tab==="avaliar")renderAvaliar();else if(tab==="perfis")renderCards();else if(tab==="resultados")renderResultados();else if(tab==="sorteio")renderPick();else renderGrupo()}
+function render(){if(!renderShell()){renderLogin();if(S.visitor){if(vtab==="perfis")renderCards();else if(vtab==="resultados")renderResultados()}return}if(tab==="avaliar")renderAvaliar();else if(tab==="perfis")renderCards();else if(tab==="resultados")renderResultados();else if(tab==="sorteio")renderPick();else renderGrupo()}
 
 /* ---------- início ---------- */
 let unsubs=[];

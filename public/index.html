@@ -241,7 +241,7 @@ input[type=text],input[type=tel],select{font:inherit;color:var(--fg);background:
 .rate.locked .dots button{opacity:.55;cursor:not-allowed}
 .notesbox{margin-top:16px;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .notesbox p{margin:0;font-size:14px;flex:1 1 220px}
-.visitor-head{margin-top:28px;padding-top:18px;border-top:1px solid var(--line)}
+.visitor-head{margin:16px 0 0;padding:10px 12px;border-radius:8px;background:var(--chalk);color:var(--fg)}
 .notesbox .acts2{display:flex;gap:8px;flex-wrap:wrap}
 .import{margin-top:18px;border:1px dashed var(--line);border-radius:10px;padding:10px 12px}
 .import summary{cursor:pointer;font:700 15px var(--display);text-transform:uppercase;letter-spacing:.04em}
@@ -253,6 +253,7 @@ input[type=text],input[type=tel],select{font:inherit;color:var(--fg);background:
 <header class="top"><div class="in">
   <div class="brand"><div class="crest"><img src="logo-128.jpg" alt="" width="44" height="44"><h1>Peixe Futebol Clube</h1></div><span class="who"><span id="who"></span> <button class="mini" type="button" id="logoutBtn" hidden style="color:var(--head-ink)">Sair</button></span></div>
   <nav class="tabs" role="tablist" id="tabs" hidden>
+    <button role="tab" id="tab-entrar" data-tab="entrar" hidden>Entrar</button>
     <button role="tab" id="tab-avaliar" data-tab="avaliar">Avaliar</button>
     <button role="tab" id="tab-perfis" data-tab="perfis">Perfis</button>
     <button role="tab" id="tab-sorteio" data-tab="sorteio">Sorteio</button>
@@ -267,7 +268,7 @@ input[type=text],input[type=tel],select{font:inherit;color:var(--fg);background:
   <section id="v-login"></section>
   <section id="v-avaliar" hidden></section>
   <section id="v-perfis" hidden>
-    <p class="note visitor-head" id="visitorHead" hidden>Você está vendo como visitante. Entre com seu celular, acima, para avaliar e ver o sorteio.</p>
+    <p class="note visitor-head" id="visitorHead" hidden>Você está vendo como visitante. Para avaliar e ver o sorteio, toque em Entrar e digite seu celular.</p>
     <h2>Perfis do grupo</h2>
     <p class="lead">Média das notas de todo o grupo. A nota geral é a média dos cinco quesitos (Defesa, Passe, Ataque, Resistência e Velocidade), cada um de 1 a 5. A autoavaliação de cada um também entra na média.</p>
     <div class="cards" id="cards"></div>
