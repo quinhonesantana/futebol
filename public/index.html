@@ -187,6 +187,10 @@ input[type=text],input[type=tel],select{font:inherit;color:var(--fg);background:
 .tip:focus{outline:none}
 .tip:focus-visible{outline:2px solid var(--vest);outline-offset:2px;border-radius:2px}
 .tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;bottom:calc(100% + 6px);z-index:20;background:var(--fg);color:var(--bg);font:500 12px/1.35 var(--body);letter-spacing:0;text-transform:none;text-align:left;padding:6px 9px;border-radius:6px;width:max-content;max-width:220px;white-space:normal;box-shadow:0 4px 14px rgb(0 0 0 / .18);pointer-events:none}
+.import{margin-top:18px;border:1px dashed var(--line);border-radius:10px;padding:10px 12px}
+.import summary{cursor:pointer;font:700 15px var(--display);text-transform:uppercase;letter-spacing:.04em}
+.import .row{margin-top:8px}
+#importMsg{margin-top:8px;white-space:pre-line}
 </style>
 </head>
 <body>
@@ -244,6 +248,12 @@ input[type=text],input[type=tel],select{font:inherit;color:var(--fg);background:
     <div class="summary" id="summary" role="group" aria-label="Filtrar jogadores"></div>
     <div class="gfoot"><span class="note" id="gnote"></span><button class="btn" type="button" id="copyMissing" hidden>Copiar nomes</button></div>
     <div class="gtable" id="gtable"></div>
+    <details class="import" id="importBox">
+      <summary>Importar cadastro</summary>
+      <p class="note">Traz jogadores, celulares e notas de um arquivo de cadastro (.json). Quem já tem o mesmo celular no grupo não é duplicado.</p>
+      <div class="row"><input type="file" id="importFile" accept="application/json,.json" aria-label="Arquivo de cadastro"><button class="btn primary" type="button" id="importBtn">Importar</button></div>
+      <div class="note" id="importMsg" role="status"></div>
+    </details>
   </section>
 </main>
 

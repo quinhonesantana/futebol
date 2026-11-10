@@ -67,6 +67,14 @@ Firebase → **Authentication** → **Configurações** → **Domínios autoriza
 3. Cadastre os jogadores com nome, celular e posição.
 4. Mande o link no grupo do WhatsApp. Cada um entra digitando o próprio celular.
 
+## Importar um cadastro
+Na aba **Grupo**, um organizador logado abre **Importar cadastro**, escolhe o arquivo `.json` e clica em **Importar**:
+- Entram os jogadores, com nome, posição e celular.
+- Quem já tem o mesmo celular no grupo é mantido como está, sem duplicar. Por isso dá para importar de novo sem medo.
+- As notas importadas são só as de quem está logado. As outras pessoas precisam entrar e avaliar.
+
+O arquivo tem os celulares do grupo. Não coloque esse arquivo no GitHub.
+
 ## Atualizar o app depois
 - **Publicou arrastando a pasta:** no Netlify, abra o site → **Deploys** → arraste a pasta `public` atualizada.
 - **Usa GitHub:** é só enviar as alterações.

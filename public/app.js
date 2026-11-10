@@ -423,6 +423,42 @@ function renderGrupo(){
       chip,acts));
   }
 }
+/* ---------- importar cadastro (organizador) ---------- */
+$("importBtn").addEventListener("click",async()=>{
+  const msg=$("importMsg"),btn=$("importBtn");const f=$("importFile").files[0];
+  if(!f){msg.textContent="Escolha o arquivo de cadastro primeiro.";return}
+  let data;try{data=JSON.parse(await f.text())}catch(e){msg.textContent="Esse arquivo não é um cadastro válido (.json).";return}
+  const list=Array.isArray(data.players)?data.players:[];
+  if(!list.length){msg.textContent="O arquivo não tem jogadores.";return}
+  btn.disabled=true;msg.textContent="Importando…";
+  const byPhone=new Map([...S.phones.entries()].map(([pid,ph])=>[ph,pid]));
+  const map={};let created=0,existed=0,bad=0;
+  try{
+    for(const p of list){
+      const d=normPhone(p.phone);
+      if(!d||!p.name||!p.id){bad++;continue}
+      if(byPhone.has(d)){map[p.id]=byPhone.get(d);existed++;continue}
+      const pos=POS[p.pos]?p.pos:"mei";
+      await S.db.collection("players").doc(p.id).set({name:String(p.name).slice(0,40),pos,createdAt:p.createdAt||Date.now()});
+      await S.db.collection("phoneIndex").doc(e164(d)).set({pid:p.id});
+      byPhone.set(d,p.id);map[p.id]=p.id;created++;
+    }
+    /* Notas: as regras só deixam gravar as notas de quem está logado. */
+    let mineRated=0,skipped=0;const me=myPid();
+    for(const r of Array.isArray(data.ratings)?data.ratings:[]){
+      if(map[r.raterId]!==me){skipped++;continue}
+      for(const [oldPid,sc] of Object.entries(r.scores||{})){const pid=map[oldPid];if(!pid)continue;
+        const cur=S.mine[pid]||{};const clean={};
+        for(const [k] of ATTRS){const v=+sc[k];if(v>=1&&v<=5)clean[k]=v}
+        if(POS[sc.sec])clean.sec=sc.sec;
+        S.mine[pid]={...clean,...cur};mineRated++}
+    }
+    if(mineRated){S.dirty=true;await saveMine()}
+    msg.textContent=[`${created} jogadores importados.`,existed?`${existed} já estavam no grupo e foram mantidos.`:"",bad?`${bad} linhas sem nome ou celular válido foram ignoradas.`:"",
+      mineRated?`Suas notas para ${mineRated} jogadores foram importadas.`:"",skipped?`As notas de ${skipped} outra(s) pessoa(s) não foram importadas: cada um precisa entrar e avaliar.`:""].filter(Boolean).join("\n");
+  }catch(x){console.error(x);msg.textContent=(x.code==="permission-denied"?"O Firebase recusou: só organizadores importam.":"A importação parou no meio. Rode de novo: quem já entrou não é duplicado.")+` (${created} importados até aqui)`}
+  finally{btn.disabled=false}
+});
 function confirmBtn(label,confirmLabel,fn){
   const b=el("button",{class:"mini danger",type:"button",text:label});
   b.addEventListener("click",async()=>{if(b.dataset.c!=="1"){b.dataset.c="1";b.textContent=confirmLabel;setTimeout(()=>{b.dataset.c="";b.textContent=label},4000);return}
