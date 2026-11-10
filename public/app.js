@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, onSnapshot, runTransaction, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const configured=!!firebaseConfig.apiKey&&!firebaseConfig.apiKey.startsWith("COLE");
@@ -73,7 +73,7 @@ let tab=ls("tab")||"avaliar";
 function setTab(t){tab=t;ls("tab",t);render()}
 let vtab=ls("vtab")||"entrar";
 document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>{if(!myPid()){vtab=b.dataset.tab;ls("vtab",vtab);render();window.scrollTo({top:0});return}setTab(b.dataset.tab)}));
-const VIEWS=["avaliar","perfis","sorteio","resultados","grupo"];
+const VIEWS=["avaliar","perfis","sorteio","aovivo","resultados","grupo"];
 function renderShell(){
   const me=myPid(),g=gated();
   $("tabs").hidden=!me;$("v-login").hidden=!!me;$("loginLogo").hidden=!!me;
@@ -85,10 +85,10 @@ function renderShell(){
     $("v-login").hidden=vtab!=="entrar";$("loginLogo").hidden=vtab!=="entrar";
     for(const v of VIEWS)$("v-"+v).hidden=!(vis&&v===vtab);
     $("visitorHead").hidden=!(vis&&vtab!=="entrar");$("who").textContent="";return false}
-  $("visitorHead").hidden=true;$("tab-entrar").hidden=true;for(const t of ["avaliar","perfis","sorteio","resultados"])$("tab-"+t).hidden=false;
+  $("visitorHead").hidden=true;$("tab-entrar").hidden=true;for(const t of ["avaliar","perfis","sorteio","aovivo","resultados"])$("tab-"+t).hidden=false;
   $("tab-grupo").hidden=!S.isAdmin;
-  for(const t of ["perfis","sorteio","resultados"]){$("tab-"+t).disabled=g;$("tab-"+t).title=g?"Libera depois que você avaliar todo o grupo":""}
-  if((tab==="perfis"||tab==="sorteio"||tab==="resultados")&&g)tab="avaliar";
+  for(const t of ["perfis","sorteio","aovivo","resultados"]){$("tab-"+t).disabled=g;$("tab-"+t).title=g?"Libera depois que você avaliar todo o grupo":""}
+  if((tab==="perfis"||tab==="sorteio"||tab==="aovivo"||tab==="resultados")&&g)tab="avaliar";
   if(tab==="grupo"&&!S.isAdmin)tab="avaliar";
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===tab));
   for(const v of VIEWS)$("v-"+v).hidden=v!==tab;
@@ -586,6 +586,200 @@ function renderResultados(){
   }
 }
 
+/* ---------- ao vivo ---------- */
+/* A partida ao vivo é um documento compartilhado (live/current) que todos os celulares escutam.
+   Começar e encerrar usam transação, para dois toques ao mesmo tempo não criarem o mesmo jogo duas vezes.
+   Ao encerrar, o jogo vira um documento em matches e aparece na aba Resultados. */
+const LV={SESSION:90*60,MATCH3:7*60,WEEKDAY:1,H:19,M:30,CLOSE_AFTER:30*60};
+const liveRef=()=>doc(fs,"live","current");
+S.live=null;let lvTimer=null,lvTimeUpShown=null,lvWake=null;
+function lvSessionStart(ref){const d=new Date(ref);d.setHours(LV.H,LV.M,0,0);d.setDate(d.getDate()-((d.getDay()-LV.WEEKDAY+7)%7));return d.getTime()}
+function lvWindow(now){const s0=lvSessionStart(now),end=s0+(LV.SESSION+LV.CLOSE_AFTER)*1000;
+  if(now>=s0&&now<end)return {open:true,next:s0};return {open:false,next:now<s0?s0:s0+7*24*3600e3}}
+function lvFmt(){return (S.saved?.teams?.length||0)===2?"2":"3"}
+/* estado da partida do sorteio publicado; se ainda não existe, o padrão do formato */
+function lvState(){
+  const L=S.live;if(L&&S.saved&&L.drawAt===S.saved.at)return L;
+  const fmt=lvFmt();return {drawAt:S.saved?.at,fmt,status:fmt==="2"?"ready":"setup",a:fmt==="2"?0:null,b:fmt==="2"?1:null,queue:[],streak:{},gameNo:0,events:[],startedAt:null,sessionStart:null,dur:fmt==="2"?LV.SESSION:LV.MATCH3,fresh:true}}
+function lvOpen(){if(!S.saved)return false;const L=lvState();if(L.status==="running")return true;if((L.forceUntil||0)>Date.now())return true;return lvWindow(Date.now()).open}
+const lvTeam=i=>({name:TEAMS[i][0],c:`var(${TEAMS[i][1]})`,ids:(S.saved.teams[i]||[]).filter(hasP)});
+function lvElapsed(L){return L.status==="running"&&L.startedAt?Math.max(0,(Date.now()-L.startedAt)/1000):0}
+function lvRemaining(L){return Math.max(0,(L.dur||LV.MATCH3)-lvElapsed(L))}
+const lvMin=L=>Math.min(Math.ceil((L.dur||0)/60),Math.floor(lvElapsed(L)/60)+1);
+const lvClock=s=>{s=Math.ceil(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=String(s%60).padStart(2,"0");return h?`${h}:${String(m).padStart(2,"0")}:${x}`:`${String(m).padStart(2,"0")}:${x}`};
+function lvGoals(L,side){return (L.events||[]).filter(e=>e.kind==="goal"&&e.team===L[side]).length}
+function lvMyName(){return S.players.get(myPid())?.name||"Alguém"}
+function lvToast(msg){const old=document.querySelector(".lv-toast");if(old)old.remove();const t=el("div",{class:"lv-toast",role:"status",text:msg});document.body.append(t);setTimeout(()=>t.remove(),3400)}
+async function lvAwake(on){try{if(on&&!lvWake&&navigator.wakeLock)lvWake=await navigator.wakeLock.request("screen");if(!on&&lvWake){await lvWake.release();lvWake=null}}catch(e){lvWake=null}}
+/* regra do rodízio com 3 times */
+function lvPlan(L,ga,gb){
+  if(L.fmt==="2"||!(L.queue||[]).length)return {out:null,why:L.fmt==="2"?"":"Só dois times: os dois continuam."};
+  if((L.gameNo||0)===0){if(ga!==gb){const l=ga>gb?L.b:L.a;return {out:l,why:`${TEAMS[l][0]} perdeu o 1º jogo e sai.`}}return {out:null,pick:true,why:"Empate no 1º jogo: escolham quem sai."}}
+  const l=(L.streak?.[L.a]||0)>=2?L.a:L.b;return {out:l,why:`${TEAMS[l][0]} jogou 2 seguidas e sai.`};
+}
+/* ---------- ações ---------- */
+async function lvTx(fn){try{await runTransaction(fs,async tx=>{const snap=await tx.get(liveRef());const cur=snap.exists()?snap.data():null;await fn(tx,cur)});return true}
+  catch(e){console.error(e);status(e.code==="permission-denied"?"Sem permissão para mexer na partida. Confira se as regras novas do Firestore foram publicadas.":e.message&&e.message.startsWith("lv:")?e.message.slice(3):"Não deu para atualizar a partida. Confira a internet e tente de novo.",true);return false}}
+async function lvPickStart(a,b){
+  const n=S.saved.teams.length;const queue=[...Array(n).keys()].filter(i=>i!==a&&i!==b);const now=Date.now();
+  const ok=await lvTx(async(tx,cur)=>{if(cur&&cur.drawAt===S.saved.at&&cur.status!=="setup")throw new Error("lv:A partida já começou em outro celular.");
+    tx.set(liveRef(),{drawAt:S.saved.at,fmt:"3",status:"running",a,b,queue,streak:{[a]:1,[b]:1},gameNo:0,startedAt:now,sessionStart:now,dur:LV.MATCH3,events:[{id:"s"+now,kind:"start",by:myPid(),at:now}],forceUntil:cur?.forceUntil||0})});
+  if(ok){lvAwake(true);lvToast(`1º jogo: ${TEAMS[a][0]} x ${TEAMS[b][0]}. ${queue.map(i=>TEAMS[i][0]).join(" e ")} espera.`)}
+}
+async function lvStart(){
+  const L0=lvState();const now=Date.now();
+  const ok=await lvTx(async(tx,cur)=>{const L=cur&&cur.drawAt===S.saved.at?cur:L0;if(L.status!=="ready")throw new Error("lv:A partida já começou em outro celular.");
+    tx.set(liveRef(),{...L,fresh:null,drawAt:S.saved.at,status:"running",startedAt:now,sessionStart:L.sessionStart||now,dur:L.fmt==="2"?LV.SESSION:LV.MATCH3,events:[{id:"s"+now,kind:"start",by:myPid(),at:now}]})});
+  if(ok)lvAwake(true);
+}
+async function lvGoal(ev){try{await updateDoc(liveRef(),{events:arrayUnion(ev)});lvToast(`Gol do ${TEAMS[ev.team][0]}${ev.scorer&&ev.scorer!=="?"?`: ${ev.own?"contra de ":""}${getP(ev.scorer)?.name||""}`:""} aos ${ev.min}'.`)}
+  catch(e){console.error(e);status("Não deu para marcar o gol. Confira a internet e tente de novo.",true)}}
+async function lvUndo(ev){try{await updateDoc(liveRef(),{events:arrayRemove(ev)});lvToast("Gol desfeito.")}catch(e){console.error(e);status("Não deu para desfazer o gol.",true)}}
+async function lvEnd(expectedGame,chosenOut){
+  const now=Date.now();let summary="";
+  const firstOfMonth=!S.matches.some(m=>{const x=new Date(m.at),y=new Date(now);return x.getFullYear()===y.getFullYear()&&x.getMonth()===y.getMonth()});
+  const ok=await lvTx(async(tx,L)=>{
+    if(!L||L.drawAt!==S.saved.at||L.status!=="running"||(L.gameNo||0)!==expectedGame)throw new Error("lv:Essa partida já foi encerrada em outro celular.");
+    const ga=lvGoals(L,"a"),gb=lvGoals(L,"b");const goalsEv=(L.events||[]).filter(e=>e.kind==="goal");
+    const side=t=>{const ids=(S.saved.teams[t]||[]).filter(hasP);const own=goalsEv.filter(e=>e.team===t&&(e.own||e.scorer==="?")).length;return {team:t,roster:ids,goals:goalsEv.filter(e=>e.team===t).length,own}};
+    const scorers={};for(const e of goalsEv)if(!e.own&&e.scorer&&e.scorer!=="?")scorers[e.scorer]=(scorers[e.scorer]||0)+1;
+    const assists={};for(const e of goalsEv)if(e.assist)assists[e.assist]=(assists[e.assist]||0)+1;
+    const names={};for(const t of [L.a,L.b])for(const id of (S.saved.teams[t]||[]))if(hasP(id))names[id]=getP(id).name;
+    const minutes=Math.round(Math.min(L.dur,(now-L.startedAt)/1000)/60);
+    tx.set(doc(collection(fs,"matches")),{at:now,drawAt:S.saved.at,a:side(L.a),b:side(L.b),scorers,assists,names,minutes,source:"live",by:myPid(),events:goalsEv.map(e=>({team:e.team,scorer:e.scorer,assist:e.assist||null,own:!!e.own,min:e.min,by:e.by}))});
+    if(L.fmt==="2"){tx.set(liveRef(),{...L,status:"done",gameNo:(L.gameNo||0)+1,endedAt:now});summary=`Pelada encerrada: ${TEAMS[L.a][0]} ${ga} x ${gb} ${TEAMS[L.b][0]}. O resultado já está na aba Resultados.`;return}
+    const plan=lvPlan(L,ga,gb);const out=plan.out??chosenOut;if(out==null)throw new Error("lv:Escolha quem sai antes de salvar.");
+    const stay=out===L.a?L.b:L.a;const queue=[...(L.queue||[]),out];const inn=queue.shift();const streak={...(L.streak||{})};streak[out]=0;streak[stay]=(streak[stay]||0)+1;streak[inn]=1;
+    tx.set(liveRef(),{...L,status:"ready",a:stay,b:inn,queue,streak,gameNo:(L.gameNo||0)+1,startedAt:null,events:[]});
+    summary=`Jogo salvo nos Resultados. Próximo: ${TEAMS[stay][0]} x ${TEAMS[inn][0]}.`;
+  });
+  if(!ok)return;lvAwake(false);lvToast(summary);
+  if(firstOfMonth&&!S.notes.locked)S.db.doc("config/notes").set({locked:true,lockedAt:now,by:myPid()}).catch(e=>console.error(e));
+}
+async function lvForceOpen(){const until=Date.now()+3*3600e3;
+  const ok=await lvTx(async(tx,cur)=>{const L=cur&&cur.drawAt===S.saved.at?cur:lvState();tx.set(liveRef(),{...L,fresh:null,drawAt:S.saved.at,forceUntil:until})});
+  if(ok)lvToast("Partida ao vivo aberta pelas próximas 3 horas.")}
+/* ---------- tela ---------- */
+function lvSheet(tc,...kids){const sheet=el("div",{class:"lv-sheet",role:"dialog","aria-modal":"true",style:`--tc:${tc}`},...kids);
+  const scrim=el("div",{class:"lv-scrim",onclick:e=>{if(e.target===scrim)lvClose()}},sheet);$("lvLayer").replaceChildren(scrim);const f=sheet.querySelector("button");if(f)f.focus()}
+function lvClose(){$("lvLayer").replaceChildren()}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")lvClose()});
+function lvOpenGoal(L,t){
+  const T=lvTeam(t),opp=t===L.a?L.b:L.a,O=lvTeam(opp);const sel={scorer:null,own:false,assist:null};const min=lvMin(L);const gameNo=L.gameNo||0;
+  const scorers=el("div",{class:"lv-chips"}),owns=el("div",{class:"lv-chips"}),assists=el("div",{class:"lv-chips"}),aTitle=el("h4",{text:"Assistência (opcional)"});
+  const ok=el("button",{class:"btn primary big",type:"button",disabled:true,text:"Confirmar gol",style:"flex:1",onclick:()=>{
+    const cur=lvState();if(cur.status!=="running"||(cur.gameNo||0)!==gameNo){lvClose();status("Essa partida já foi encerrada.",true);return}
+    lvClose();lvGoal({id:"g"+Date.now()+Math.random().toString(36).slice(2,6),kind:"goal",team:t,scorer:sel.scorer,own:sel.own,assist:sel.own||sel.scorer==="?"?null:sel.assist,min,by:myPid(),at:Date.now()})}});
+  const chip=(txt,on,fn,alt)=>el("button",{type:"button",class:"lv-chip"+(alt?" alt":""),"aria-pressed":String(!!on),text:txt,onclick:fn});
+  function paint(){
+    scorers.replaceChildren(...T.ids.map(id=>chip(getP(id).name,!sel.own&&sel.scorer===id,()=>{sel.scorer=id;sel.own=false;paint()})),chip("Não sei quem fez",sel.scorer==="?",()=>{sel.scorer="?";sel.own=false;sel.assist=null;paint()},true));
+    owns.replaceChildren(...O.ids.map(id=>chip(getP(id).name,sel.own&&sel.scorer===id,()=>{sel.scorer=id;sel.own=true;sel.assist=null;paint()},true)));
+    const showA=sel.scorer&&!sel.own&&sel.scorer!=="?";aTitle.hidden=assists.hidden=!showA;
+    assists.replaceChildren(...T.ids.filter(id=>id!==sel.scorer).map(id=>chip(getP(id).name,sel.assist===id,()=>{sel.assist=sel.assist===id?null:id;paint()})),chip("Sem assistência",!sel.assist,()=>{sel.assist=null;paint()},true));
+    ok.disabled=!sel.scorer}
+  lvSheet(T.c,el("h3",{text:`Gol do ${T.name} · ${min}'`}),el("h4",{text:"Quem fez"}),scorers,aTitle,assists,el("h4",{text:`Gol contra de alguém do ${O.name}`}),owns,
+    el("div",{class:"lv-actions"},el("button",{class:"btn",type:"button",text:"Cancelar",onclick:lvClose}),ok));paint();
+}
+function lvOpenEnd(L){
+  const ga=lvGoals(L,"a"),gb=lvGoals(L,"b"),A=lvTeam(L.a),B=lvTeam(L.b);const gameNo=L.gameNo||0;
+  const sum=el("div",{class:"lv-sum"},el("i",{style:`--tc:${A.c}`}),A.name,el("span",{class:"n",text:`${ga} x ${gb}`}),B.name,el("i",{style:`--tc:${B.c}`}));
+  const save=el("button",{class:"btn primary big",type:"button",style:"flex:1",text:L.fmt==="2"?"Salvar resultado":"Salvar e montar o próximo"});
+  const rule=el("div",{class:"lv-rule"});let chosen=null;const plan=lvPlan(L,ga,gb);
+  const paint=()=>{if(L.fmt==="2"){rule.replaceChildren(el("b",{text:ga===gb?"Empate. ":`${ga>gb?A.name:B.name} venceu. `}),`${Math.round(Math.min(L.dur,lvElapsed(L))/60)} minutos de jogo.`);return}
+    const out=plan.out??chosen;if(out==null){rule.replaceChildren(el("b",{text:plan.why}));save.disabled=true;return}
+    const stay=out===L.a?L.b:L.a;rule.replaceChildren(el("b",{text:plan.pick?`${TEAMS[out][0]} sai (escolhido no empate). `:plan.why+" "}),`Próximo jogo: ${TEAMS[stay][0]} x ${TEAMS[L.queue[0]][0]}.`);save.disabled=false};
+  const chooser=plan.pick?el("div",{class:"lv-chips",style:"justify-content:center;margin-top:10px"},...[L.a,L.b].map(t=>el("button",{type:"button",class:"lv-chip","aria-pressed":"false",text:`Sai o ${TEAMS[t][0]}`,onclick:ev=>{chosen=t;for(const x of ev.currentTarget.parentElement.children)x.setAttribute("aria-pressed",String(x===ev.currentTarget));paint()}}))):null;
+  save.addEventListener("click",async()=>{save.disabled=true;await lvEnd(gameNo,chosen);lvClose()});
+  lvSheet("var(--vest)",el("h3",{text:L.fmt==="2"?"Encerrar pelada":"Encerrar partida"}),sum,rule,chooser,el("p",{class:"note",text:"O jogo vai para a aba Resultados com os gols e as assistências."}),
+    el("div",{class:"lv-actions"},el("button",{class:"btn",type:"button",text:"Voltar",onclick:lvClose}),save));paint();
+}
+function lvRoster(t,L,goalsById){const T=lvTeam(t);
+  return el("div",{class:"lv-roster",style:`--tc:${T.c}`},el("h3",{text:T.name}),el("ul",{},...T.ids.map(id=>{const g=goalsById[id]||0;const p={id,...getP(id)};
+    return el("li",{},posTag(p,true),el("span",{class:"n",text:dName(id)}),g?el("span",{class:"lv-balls",text:g+(g>1?" gols":" gol")}):null)})))}
+function lvWaiting(box){
+  const w=lvWindow(Date.now());const when=new Date(w.next);
+  const cd=el("div",{class:"lv-cd",id:"lvCountdown"});
+  box.append(el("div",{class:"lv-gate"},el("img",{src:"logo.jpg",alt:"Escudo do Peixe Futebol Clube",class:"lv-crest"}),
+    S.saved?el("span",{class:"lv-state ok",text:"Times publicados"}):el("span",{class:"lv-state wait",text:"Aguardando o sorteio"}),
+    el("h2",{text:"Próxima pelada"}),el("div",{class:"lv-when",text:`${when.toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit"})} · 19:30`}),cd,
+    el("p",{class:"note",text:S.saved?"A partida ao vivo abre sozinha na segunda às 19:30, com os times publicados.":"A partida ao vivo abre na segunda às 19:30, depois que os organizadores publicarem os times."}),
+    S.saved&&S.isAdmin?el("button",{class:"btn",type:"button",text:"Abrir agora (fora do horário)",onclick:lvForceOpen}):null,
+    !S.saved&&S.isAdmin?el("p",{class:"note"},el("b",{text:"Organizador: "}),"publique o sorteio na aba Sorteio para liberar esta tela."):null));
+  if(S.saved){const pv=el("div",{class:"lv-rosters",style:"margin-top:14px"});S.saved.teams.forEach((_,i)=>pv.append(lvRoster(i,null,{})));box.append(pv)}
+  lvTick();
+}
+function renderAoVivo(){
+  const box=$("v-aovivo");box.replaceChildren();
+  if(!lvOpen()){lvWaiting(box);return}
+  const L=lvState();const fmt=L.fmt;
+  if(L.status==="done"){const ms=S.matches.filter(m=>m.drawAt===S.saved.at);box.append(el("div",{class:"lv-gate"},el("img",{src:"logo.jpg",alt:"",class:"lv-crest"}),el("span",{class:"lv-state",text:"Pelada encerrada"}),el("h2",{text:"Valeu, Peixe!"}),
+    el("p",{class:"note",text:"O resultado já está na aba Resultados."}),...ms.map(m=>el("div",{class:"lv-gameline"},TEAMS[m.a.team][0],el("b",{text:` ${m.a.goals} x ${m.b.goals} `}),TEAMS[m.b.team][0]))));return}
+  /* placar */
+  const board=el("section",{class:"lv-board","aria-label":"Placar"});
+  const st=L.status==="setup"?["paused","Não começou"]:L.status==="ready"?["paused","Não começou"]:lvRemaining(L)<=0?["over","Fim do tempo"]:["","Ao vivo"];
+  const metaTxt=fmt==="2"?"2 times · jogo direto até o fim":`${(L.gameNo||0)+1}º jogo de hoje · 7 min`;
+  board.append(el("div",{class:"lv-meta"},el("span",{class:"lv-live "+st[0]},el("i"),st[1]),el("span",{text:metaTxt})));
+  if(L.status==="setup"){board.append(el("div",{class:"lv-setupmsg"},el("b",{text:"Quem começa?"}),el("span",{text:"Escolham abaixo os 2 times do 1º jogo. O outro espera."})))}
+  else{const A=lvTeam(L.a),B=lvTeam(L.b);board.style.setProperty("--ca",A.c);board.style.setProperty("--cb",B.c);
+    const sideEl=(side,T)=>{const t=L[side];const s=L.streak?.[t]||0;return el("div",{class:"lv-side",style:`--tc:${T.c}`},el("div",{class:"lv-tname"},el("i"),T.name),el("div",{class:"lv-goals",text:String(lvGoals(L,side))}),
+      fmt==="3"?el("div",{class:"lv-streak",text:(L.gameNo||0)===0?"1º jogo":s>=2?"2º jogo seguido · sai no fim":"entrou agora"}):null)};
+    board.append(el("span",{class:"lv-bar l"}),el("span",{class:"lv-bar r"}),el("div",{class:"lv-score"},sideEl("a",A),el("div",{class:"lv-mid"},el("div",{class:"lv-x",text:"x"}),el("div",{class:"lv-clock",id:"lvClock"})),sideEl("b",B)),
+      el("div",{class:"lv-tbar"},el("i",{id:"lvTbar"})))}
+  if(fmt==="3")board.append(el("div",{class:"lv-sess"},"Pelada 1h30",el("span",{class:"lv-sbar"},el("i",{id:"lvSbar"})),el("span",{},"faltam ",el("b",{id:"lvSess"}))));
+  box.append(board);
+  /* controles: qualquer jogador ou organizador */
+  const ctl=el("section",{class:"lv-panel"});
+  if(L.status==="setup"){const pick=S.lvPick||[];const n=S.saved.teams.length;
+    ctl.append(el("h2",{text:"Escolha quem começa"}));
+    const grid=el("div",{class:"lv-pick"});
+    for(let i=0;i<n;i++){const T=lvTeam(i);const on=pick.includes(i);grid.append(el("button",{type:"button",class:"lv-pickbtn",style:`--tc:${T.c}`,"aria-pressed":String(on),onclick:()=>{S.lvPick=on?pick.filter(x=>x!==i):[...pick,i].slice(-2);renderAoVivo()}},el("i"),T.name,el("small",{text:on?"Começa jogando":"Toque para escolher"})))}
+    ctl.append(grid,el("button",{class:"btn primary big",type:"button",style:"width:100%;margin-top:10px",disabled:pick.length!==2,text:pick.length===2?`Começar ${TEAMS[pick[0]][0]} x ${TEAMS[pick[1]][0]}`:"Escolha 2 times",onclick:()=>lvPickStart(pick[0],pick[1])}),
+      el("p",{class:"note",style:"margin:8px 0 0",text:"No 1º jogo o perdedor sai. Depois, sai sempre quem jogou 2 seguidas."}));
+  }else{
+    if(L.status==="running"){const A=lvTeam(L.a),B=lvTeam(L.b);
+      ctl.append(el("div",{class:"lv-goalbtns"},el("button",{class:"lv-goalbtn",type:"button",style:`--tc:${A.c}`,onclick:()=>lvOpenGoal(lvState(),L.a)},"+ Gol "+A.name,el("small",{text:"toque e escolha quem fez"})),
+        el("button",{class:"lv-goalbtn",type:"button",style:`--tc:${B.c}`,onclick:()=>lvOpenGoal(lvState(),L.b)},"+ Gol "+B.name,el("small",{text:"toque e escolha quem fez"}))),
+        el("button",{class:"btn big lv-end",type:"button",text:fmt==="2"?"Encerrar pelada":"Encerrar partida",onclick:()=>lvOpenEnd(lvState())}))}
+    else ctl.append(el("button",{class:"btn primary big",type:"button",style:"width:100%",text:fmt==="2"?"Começar a pelada":`Começar ${TEAMS[L.a][0]} x ${TEAMS[L.b][0]}`,onclick:lvStart}));
+    ctl.append(el("p",{class:"note",style:"margin:8px 0 0",text:fmt==="2"?"Com 2 times o jogo vai direto até o fim da 1h30. As substituições não precisam ser marcadas.":"Qualquer jogador pode começar e encerrar a partida e marcar gols. O seu nome fica registrado."}));
+  }
+  box.append(ctl);
+  /* lances */
+  const tl=el("ul",{class:"lv-tl"});const evs=[...(L.events||[])].reverse();
+  for(const e of evs){
+    if(e.kind==="goal"){const T=lvTeam(e.team);const p=getP(e.scorer);const as=e.assist?getP(e.assist):null;const who=e.by===myPid()?"você":(S.players.get(e.by)?.name||"alguém");
+      tl.append(el("li",{style:`--tc:${T.c}`},el("span",{class:"min",text:e.min+"'"}),el("span",{class:"dot"}),
+        el("span",{class:"what"},el("b",{text:e.own?`Gol contra de ${p?.name||"?"}`:e.scorer==="?"?"Gol (autor não informado)":`Gol de ${p?.name||"?"}`}),el("small",{text:`${T.name}${as?` · assistência de ${as.name}`:""} · marcado por ${who}`})),
+        (S.isAdmin||e.by===myPid())&&L.status==="running"?el("button",{class:"mini",type:"button",text:"Desfazer",onclick:()=>lvUndo(e)}):el("span")))}
+    else{const who=e.by===myPid()?"você começou":`começada por ${S.players.get(e.by)?.name||"alguém"}`;tl.append(el("li",{class:"sys"},el("span",{class:"min",text:"1'"}),el("span",{class:"dot"}),el("span",{class:"what",text:`Bola rolando · ${who}`}),el("span")))}
+  }
+  if(!evs.length)tl.append(el("li",{class:"sys"},el("span"),el("span"),el("span",{class:"what",text:L.status==="setup"?"Nenhum lance ainda. Escolham os times e comecem o 1º jogo.":"Nenhum lance ainda."}),el("span")));
+  box.append(el("section",{class:"lv-panel"},el("h2",{text:"Lances"}),tl));
+  /* em campo, próximos, jogos de hoje */
+  const gById={};for(const e of L.events||[])if(e.kind==="goal"&&!e.own&&e.scorer)gById[e.scorer]=(gById[e.scorer]||0)+1;
+  const rs=el("div",{class:"lv-rosters"});const on=L.status==="setup"?S.saved.teams.map((_,i)=>i):[L.a,L.b];for(const t of on)rs.append(lvRoster(t,L,gById));
+  box.append(el("section",{class:"lv-panel"},el("h2",{text:L.status==="setup"?"Times":"Em campo"}),rs));
+  if(fmt==="3"&&L.status!=="setup"){const q=el("div",{class:"lv-queue"});
+    (L.queue||[]).forEach((t,i)=>{const T=lvTeam(t);q.append(el("div",{class:"lv-qitem",style:`--tc:${T.c}`},el("b",{text:T.name}),el("span",{class:"note",text:T.ids.map(id=>getP(id).name.split(" ")[0]).join(", ")}),i===0?el("span",{class:"lv-tag",text:"Entra a seguir"}):null))});
+    const res=(S.saved.res||[]).filter(hasP);if(res.length)q.append(el("div",{class:"lv-qitem",style:"--tc:var(--line)"},el("b",{text:"Reservas"}),el("span",{class:"note",text:res.map(id=>getP(id).name).join(", ")})));
+    const plan=lvPlan(L,lvGoals(L,"a"),lvGoals(L,"b"));
+    box.append(el("section",{class:"lv-panel"},el("h2",{text:"Próximos"}),q,el("p",{class:"note",style:"margin:8px 0 0",text:`No 1º jogo o perdedor sai (no empate, vocês escolhem). Depois, sai sempre quem jogou 2 seguidas.${L.status==="running"?" Se acabasse agora: "+plan.why:""}`})))}
+  const ms=S.matches.filter(m=>m.drawAt===S.saved.at).sort((a,b)=>a.at-b.at);
+  if(fmt==="3")box.append(el("section",{class:"lv-panel"},el("h2",{text:"Jogos de hoje"}),ms.length?el("ol",{class:"lv-games"},...ms.map(m=>el("li",{},el("i",{style:`--tc:var(${TEAMS[m.a.team][1]})`}),TEAMS[m.a.team][0],el("b",{text:`${m.a.goals} x ${m.b.goals}`}),TEAMS[m.b.team][0],el("i",{style:`--tc:var(${TEAMS[m.b.team][1]})`})))):el("p",{class:"note",text:"Nenhum jogo encerrado ainda."})));
+  lvTick();
+}
+function lvTick(){
+  if(tab!=="aovivo"||!myPid())return;
+  const c=$("lvCountdown");if(c){const w=lvWindow(Date.now());if(lvOpen()){renderAoVivo();return}let t=Math.max(0,Math.floor((w.next-Date.now())/1000));
+    c.replaceChildren(...[[Math.floor(t/86400),"dias"],[Math.floor(t%86400/3600),"horas"],[Math.floor(t%3600/60),"min"],[t%60,"seg"]].map(([n,l])=>el("div",{},el("b",{text:String(n).padStart(2,"0")}),el("span",{text:l}))));return}
+  const L=lvState();const k=$("lvClock");
+  if(k){const r=L.status==="running"?lvRemaining(L):(L.fmt==="2"?LV.SESSION:LV.MATCH3);k.textContent=lvClock(r);k.classList.toggle("warn",r<=60&&r>0);k.classList.toggle("over",L.status==="running"&&r<=0);
+    const tb=$("lvTbar");if(tb)tb.style.width=(L.status==="running"?Math.min(100,100*lvElapsed(L)/L.dur):0)+"%";
+    if(L.status==="running"&&r<=0&&lvTimeUpShown!==`${L.drawAt}:${L.gameNo}`){lvTimeUpShown=`${L.drawAt}:${L.gameNo}`;lvToast(L.fmt==="2"?"Fim da 1h30. Toque em Encerrar pelada para salvar.":"Tempo esgotado. Toque em Encerrar partida para salvar o resultado.");renderAoVivo();return}}
+  const se=$("lvSess");if(se){const used=L.sessionStart?(Date.now()-L.sessionStart)/1000:0;se.textContent=lvClock(Math.max(0,LV.SESSION-used));const sb=$("lvSbar");if(sb)sb.style.width=Math.min(100,100*used/LV.SESSION)+"%"}
+}
+setInterval(lvTick,500);
+
 /* ---------- importar cadastro (organizador) ---------- */
 $("importBtn").addEventListener("click",async()=>{
   const msg=$("importMsg"),btn=$("importBtn");const f=$("importFile").files[0];
@@ -630,7 +824,7 @@ function confirmBtn(label,confirmLabel,fn,cls){
 }
 
 /* ---------- render ---------- */
-function render(){if(!renderShell()){renderLogin();if(S.visitor){if(vtab==="perfis")renderCards();else if(vtab==="resultados")renderResultados()}return}if(tab==="avaliar")renderAvaliar();else if(tab==="perfis")renderCards();else if(tab==="resultados")renderResultados();else if(tab==="sorteio")renderPick();else renderGrupo()}
+function render(){if(!renderShell()){renderLogin();if(S.visitor){if(vtab==="perfis")renderCards();else if(vtab==="resultados")renderResultados()}return}if(tab==="avaliar")renderAvaliar();else if(tab==="perfis")renderCards();else if(tab==="resultados")renderResultados();else if(tab==="aovivo")renderAoVivo();else if(tab==="sorteio")renderPick();else renderGrupo()}
 
 /* ---------- início ---------- */
 let unsubs=[];
@@ -652,12 +846,13 @@ function startData(){
     S.claims=new Map(s.docs.map(d=>[d.id,d.id]));if(S.uid)S.claims.set(S.uid,S.uid);
     if(S.uid){S.savedMine=JSON.parse(JSON.stringify(S.ratings.get(S.uid)?.scores||{}));if(!S.dirty)S.mine=JSON.parse(JSON.stringify(S.savedMine))}ready("ratings");schedulePub()},fail));
   unsubs.push(S.db.doc("config/notes").onSnapshot(d=>{S.notes=d.exists?d.data():{locked:false};if(tab==="avaliar"&&!S.dirty)render();else if(tab==="grupo")renderNotesBox()},fail));
-  unsubs.push(S.db.collection("matches").onSnapshot(s=>{S.matches=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.at-a.at);if(tab==="resultados"||tab==="perfis")render()},fail));
-  unsubs.push(S.db.doc("draws/latest").onSnapshot(d=>{if(d.exists){const x=d.data();const teams=[];for(let i=0;i<(x.k||0);i++)teams.push(x.teams["t"+i]||[]);S.savedGuests=x.guests||{};S.saved={teams,res:x.res||[],at:x.at}}else S.saved=null;if(tab==="sorteio")renderResult()},fail));
+  unsubs.push(S.db.collection("matches").onSnapshot(s=>{S.matches=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.at-a.at);if(tab==="resultados"||tab==="perfis"||tab==="aovivo")render()},fail));
+  unsubs.push(onSnapshot(doc(fs,"live","current"),d=>{S.live=d.exists()?d.data():null;if(tab==="aovivo")renderAoVivo()},fail));
+  unsubs.push(S.db.doc("draws/latest").onSnapshot(d=>{if(d.exists){const x=d.data();const teams=[];for(let i=0;i<(x.k||0);i++)teams.push(x.teams["t"+i]||[]);S.savedGuests=x.guests||{};S.saved={teams,res:x.res||[],at:x.at}}else S.saved=null;if(tab==="sorteio")renderResult();else if(tab==="aovivo")renderAoVivo()},fail));
   if(S.isAdmin)unsubs.push(S.db.collection("admins").onSnapshot(s=>{S.adminPhones=new Set(s.docs.map(d=>d.id));if(tab==="grupo")renderGrupo()},fail));
   if(S.isAdmin)unsubs.push(S.db.collection("phoneIndex").onSnapshot(s=>{S.phones=new Map(s.docs.map(d=>[d.data().pid,digitsOf(d.id)]));if(tab==="grupo")renderGrupo()},fail));
 }
-function resetState(){stopData();S.uid=null;S.isAdmin=S.isOwner=false;S.loaded=false;S.players=new Map();S.ratings=new Map();S.claims=new Map();S.phones=new Map();S.adminPhones=null;S.visitor=false;S.pub=null;S.pubLast=null;clearTimeout(pubTimer);S.mine={};S.savedMine={};S.notes={locked:false};S.dirty=false;S.saved=null;S.draw=null;S.matches=[];MF=null}
+function resetState(){stopData();S.uid=null;S.isAdmin=S.isOwner=false;S.loaded=false;S.players=new Map();S.ratings=new Map();S.claims=new Map();S.phones=new Map();S.adminPhones=null;S.visitor=false;S.pub=null;S.pubLast=null;clearTimeout(pubTimer);S.live=null;S.lvPick=[];S.mine={};S.savedMine={};S.notes={locked:false};S.dirty=false;S.saved=null;S.draw=null;S.matches=[];MF=null}
 /* Lê o vínculo deste aparelho (claims/<uid>) e decide para onde ir. */
 function startPublic(){
   stopData();S.visitor=true;

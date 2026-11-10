@@ -66,15 +66,24 @@ service cloud.firestore {
     }
 
     // Resultados dos jogos: todos leem, só organizadores lançam e apagam.
+    // Jogos: qualquer jogador cria ao encerrar a partida ao vivo; só organizadores alteram ou apagam.
     match /matches/{id} {
       allow read: if signed();
-      allow write: if isAdmin();
+      allow create: if hasClaim();
+      allow update, delete: if isAdmin();
+    }
+
+    // Partida ao vivo compartilhada: jogadores e organizadores começam, marcam gols e encerram.
+    match /live/{id} {
+      allow read, write: if hasClaim();
     }
 
     // Configurações do grupo (ex.: notas travadas ou em revisão).
     match /config/{id} {
       allow read: if hasClaim();
       allow write: if isAdmin();
+      // o primeiro jogo do mês trava as notas, mesmo quando quem encerra é um jogador
+      allow create, update: if hasClaim() && id == 'notes' && request.resource.data.locked == true;
     }
 
     match /draws/{id} {

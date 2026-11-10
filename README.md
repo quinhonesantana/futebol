@@ -76,7 +76,9 @@ Firebase → **Authentication** → **Configurações** → **Domínios autoriza
 |---|---|---|
 | Avaliar e ver perfis | Sim | Sim (depois de avaliar todo o grupo) |
 | Sortear e publicar os times | Sim | Não: só vê o sorteio publicado |
-| Lançar e apagar resultados dos jogos | Sim | Não: vê jogos, artilharia e desempenho |
+| Partida ao vivo: escolher quem começa, começar, marcar gols e encerrar | Sim | Sim |
+| Desfazer gol na partida ao vivo | Qualquer gol | Só os que ele marcou |
+| Lançar à mão e apagar resultados | Sim | Não: vê jogos, artilharia e desempenho |
 | Cadastrar, importar e remover jogadores | Sim | Não |
 | Ver celulares | Sim | Não |
 | Tornar ou tirar organizador | Sim (menos a si mesmo) | Não |
@@ -85,6 +87,15 @@ Firebase → **Authentication** → **Configurações** → **Domínios autoriza
 **Visitantes** (quem abre o link sem entrar) veem, na tela inicial, as abas Jogadores (perfis com as médias) e Resultados. Eles não veem o sorteio, os celulares nem quem deu qual nota. O resumo dos perfis é atualizado sozinho sempre que um organizador está com o app aberto.
 
 O sorteio feito por um organizador fica só na tela dele, como prévia, até ele tocar em **Publicar sorteio**.
+
+## Partida ao vivo
+A aba **Ao vivo** abre toda **segunda-feira às 19:30**, desde que o sorteio esteja publicado, e fica aberta até 30 minutos depois da 1h30 de pelada. Fora desse horário ela mostra a contagem regressiva e os times sorteados. Um organizador pode abri-la antes, por 3 horas, com **Abrir agora**.
+
+- **3 times:** jogos de 7 minutos. Antes do 1º jogo, escolhe-se quem começa. No 1º jogo o perdedor sai (no empate, escolhe-se quem sai). Depois, sai sempre quem jogou 2 seguidas.
+- **2 times:** um jogo só, direto até o fim da 1h30. Substituições não são marcadas.
+- Qualquer jogador ou organizador começa, marca gols (com assistência e gol contra) e encerra. Cada ação mostra quem fez.
+- Ao encerrar, o jogo vai sozinho para a aba **Resultados**. Se o primeiro jogo do mês for encerrado, as notas travam.
+- Tudo é compartilhado em tempo real entre os celulares. Dois toques em "Encerrar" ao mesmo tempo não duplicam o jogo.
 
 ## Quando as notas travam
 - **Até a primeira partida do mês:** cada jogador pode mudar as próprias notas à vontade. As notas só são gravadas quando ele toca em **Salvar notas**, no fim da página. No primeiro acesso, cada jogador é salvo ao tocar em **Próximo**.
