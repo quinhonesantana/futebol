@@ -403,9 +403,19 @@ function renderResult(){
     try{navigator.clipboard.writeText(txt).then(ok,fb)}catch(e){fb()}}}));
   if(S.draw&&S.isAdmin)acts.append(el("button",{class:"btn",type:"button",text:"Publicar sorteio",onclick:async ev=>{const b=ev.currentTarget;b.disabled=true;
     try{await S.db.doc("draws/latest").set({teams:Object.fromEntries(teams.map((t,i)=>["t"+i,t])),k:teams.length,res,guests:Object.fromEntries([...teams.flat(),...res].filter(isGuest).map(id=>{const g=getP(id);return [id,{name:g.name,pos:g.pos,lvl:+g.lvl||3}]})),at:d.at});b.textContent="Publicado para todos";status("Sorteio publicado. Todo o grupo já vê os times na aba Sorteio.")}catch(e){b.disabled=false;status(e.code==="permission-denied"?"Só organizadores podem publicar o sorteio.":"Não foi possível publicar o sorteio.",true)}}}));
+  if(S.isAdmin&&S.saved){const running=S.live&&S.live.drawAt===S.saved.at&&S.live.status==="running";
+    acts.append(confirmBtn(S.draw?"Cancelar sorteio publicado":"Cancelar publicação",running?"Toque de novo: cancela e para a partida ao vivo sem salvar":"Toque de novo: o grupo deixa de ver os times",cancelPublish,"btn danger"))}
   r.append(acts,box,el("p",{class:"note",style:"margin-top:8px",text:"O número ao lado do nome é a nota geral do perfil."}));
 }
 
+/* Cancela o sorteio publicado: o grupo deixa de ver os times e a partida ao vivo volta a esperar um sorteio.
+   Jogos já encerrados continuam em Resultados. A prévia do organizador, se houver, continua na tela para publicar de novo. */
+async function cancelPublish(){
+  const at=S.saved?.at;
+  if(S.live&&S.live.drawAt===at)await deleteDoc(doc(fs,"live","current"));
+  await S.db.doc("draws/latest").delete();
+  status("Publicação cancelada. O grupo não vê mais os times, e a partida ao vivo volta a aguardar um sorteio. Os jogos já encerrados continuam em Resultados.");
+}
 /* ---------- grupo (organizador) ---------- */
 $("addForm").addEventListener("submit",async e=>{
   e.preventDefault();const err=$("addErr");err.textContent="";
