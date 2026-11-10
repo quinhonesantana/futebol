@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f6b3a">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;font-size:14px;font-family:system-ui,sans-serif}
+img{max-width:100%}
+[hidden]{display:none!important}
+.codein{font-size:26px!important;letter-spacing:.3em;text-align:center}
+</style>
+<title>Sorteio da Pelada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: uma coluna estreita tipo app de celular; faixa verde fixa no topo com abas; cartões só onde há objeto (jogador, time). */
+:root{
+  --bg:#f3f5f1; --surface:#ffffff; --line:#d9ded5; --fg:#17201a; --muted:#5d6a60;
+  --pitch:#1f6b3a; --pitch-ink:#ffffff; --chalk:#e9efe6; --vest:#f2c230; --vest-ink:#2a2300;
+  --bad:#b3261e; --ok:#1f6b3a;
+  --t1:#2f6fd6; --t2:#e5702a; --t3:#2e9b55; --t4:#8a8f96;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1511; --surface:#17201a; --line:#2b362e; --fg:#e8eee8; --muted:#9aa89d;
+  --pitch:#2f8a4e; --pitch-ink:#ffffff; --chalk:#1c2a20; --vest:#f2c230; --vest-ink:#2a2300;
+  --bad:#f2827a; --ok:#6fd08f; --t1:#5b93f0; --t2:#f08a4b; --t3:#4cc177; --t4:#b4b9c0; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1511; --surface:#17201a; --line:#2b362e; --fg:#e8eee8; --muted:#9aa89d;
+  --pitch:#2f8a4e; --pitch-ink:#ffffff; --chalk:#1c2a20; --vest:#f2c230; --vest-ink:#2a2300;
+  --bad:#f2827a; --ok:#6fd08f; --t1:#5b93f0; --t2:#f08a4b; --t3:#4cc177; --t4:#b4b9c0; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--pitch)}
+.wrap{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--pitch);color:var(--pitch-ink)}
+header.top .in{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 0}
+.brand{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:.01em;margin:0;text-transform:uppercase;line-height:1}
+.who{font-size:13px;opacity:.9}
+nav.tabs{display:flex;gap:2px;margin-top:12px;overflow-x:auto}
+nav.tabs button{flex:1;font:600 15px var(--display);letter-spacing:.06em;text-transform:uppercase;background:transparent;color:var(--pitch-ink);border:0;border-bottom:3px solid transparent;padding:10px 6px;cursor:pointer;opacity:.75;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{opacity:1;border-bottom-color:var(--vest)}
+nav.tabs button:disabled{opacity:.4;cursor:default}
+nav.tabs button:focus-visible{outline:2px solid var(--vest);outline-offset:-2px}
+h2{font-family:var(--display);font-weight:700;font-size:22px;text-transform:uppercase;letter-spacing:.02em;margin:24px 0 4px;text-wrap:balance}
+p.lead{color:var(--muted);margin:0 0 14px;max-width:62ch}
+.note{font-size:13px;color:var(--muted)}
+.banner{background:var(--chalk);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;margin-top:16px}
+.banner.err{color:var(--bad)}
+button.btn{font:600 14px var(--body);border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:9px 14px;cursor:pointer}
+button.btn.primary{background:var(--pitch);border-color:var(--pitch);color:var(--pitch-ink)}
+button.btn.vest{background:var(--vest);border-color:var(--vest);color:var(--vest-ink)}
+button.btn.big{font-size:16px;padding:12px 18px}
+button.btn:disabled{opacity:.5;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--vest);outline-offset:2px}
+input[type=text],input[type=tel],select{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-width:0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row > input{flex:1 1 160px}
+.list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.empty{border:1.5px dashed var(--line);border-radius:10px;padding:22px 16px;text-align:center;color:var(--muted)}
+.empty strong{display:block;color:var(--fg);font-family:var(--display);font-size:20px;text-transform:uppercase;margin-bottom:4px}
+.err-text{color:var(--bad);font-size:14px;min-height:1.3em;margin-top:6px}
+
+/* Entrar */
+.login{max-width:420px;margin:28px auto 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px}
+.login h2{margin-top:0}
+.login input{width:100%;font-size:20px;letter-spacing:.04em;padding:12px;font-variant-numeric:tabular-nums}
+.login .btn{width:100%;margin-top:10px}
+.steps{display:flex;flex-direction:column;gap:6px;margin:16px 0 0;padding:0;list-style:none;font-size:14px;color:var(--muted)}
+.steps li{display:flex;gap:8px}
+.steps b{font:700 14px var(--display);color:var(--pitch);min-width:18px}
+
+/* Avaliar */
+.prog{display:flex;align-items:center;gap:10px;margin:6px 0 4px;font-size:14px}
+.bar{flex:1;height:6px;background:var(--chalk);border-radius:3px;overflow:hidden}
+.bar > i{display:block;height:100%;background:var(--pitch)}
+.rate{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.rate.done{border-color:color-mix(in srgb,var(--pitch) 45%,var(--line))}
+.rate .hd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.pname{font-weight:600;min-width:0;overflow-wrap:anywhere}
+.pos{font:700 11px var(--body);letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:var(--chalk);color:var(--muted);white-space:nowrap}
+.pos.zag{background:color-mix(in srgb,var(--t1) 18%,transparent);color:var(--fg)}
+.pos.mei{background:color-mix(in srgb,var(--vest) 35%,transparent);color:var(--fg)}
+.pos.ata{background:color-mix(in srgb,var(--t2) 22%,transparent);color:var(--fg)}
+.grow select{font-size:13px;padding:4px 6px}
+.posw{display:inline-flex;gap:4px;flex-wrap:wrap;align-items:center}
+.pos.sec{background:transparent;border:1px solid var(--line);color:var(--muted)}
+.attrs{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:4px 16px}
+@media (max-width:480px){.attrs{grid-template-columns:1fr}}
+.attr{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.attr > span{font:600 13px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);width:84px}
+.dots{display:flex;gap:4px}
+.dots button{width:32px;height:30px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--muted);font:600 13px var(--body);cursor:pointer;font-variant-numeric:tabular-nums;padding:0}
+.dots button.on{background:var(--pitch);border-color:var(--pitch);color:var(--pitch-ink)}
+.dots.sec button{width:auto;min-width:96px;padding:0 10px}
+.ob .dots.sec button{flex:1}
+.secline{font-size:12px;color:var(--muted)}
+.secline b{color:var(--fg);font-weight:600}
+.saveState{font-size:13px;color:var(--muted);min-height:1.2em}
+.mini{background:none;border:0;color:var(--muted);font-size:13px;cursor:pointer;padding:2px 4px;text-decoration:underline}
+.mini.danger{color:var(--bad)}
+
+/* Primeiro acesso: um jogador por vez */
+.ob{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:12px}
+.ob .count{font:600 13px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ob .name{font:800 34px/1.05 var(--display);text-transform:uppercase;margin:4px 0 14px;overflow-wrap:anywhere;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ob .q{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid var(--line)}
+.ob .q > div:first-child{display:flex;justify-content:space-between;gap:8px}
+.ob .q b{font:700 17px var(--display);text-transform:uppercase;letter-spacing:.04em}
+.ob .q small{color:var(--muted);font-size:12px}
+.ob .dots{gap:6px}
+.ob .dots button{flex:1;width:auto;height:44px;font-size:16px;border-radius:8px}
+.ob .nav{display:flex;justify-content:space-between;gap:10px;margin-top:14px}
+.scale{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+
+/* Perfis */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-top:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card .top{display:flex;align-items:flex-start;gap:10px}
+.ovr{font:800 34px/1 var(--display);color:var(--pitch);font-variant-numeric:tabular-nums;min-width:52px}
+.ovr.none{color:var(--muted);font-size:24px}
+.card .meta{min-width:0}
+.stat{display:grid;grid-template-columns:36px 1fr 28px;gap:8px;align-items:center;font-size:12px}
+.stat b{font:600 12px var(--display);letter-spacing:.06em;color:var(--muted)}
+.stat em{font-style:normal;text-align:right;font-variant-numeric:tabular-nums}
+.stat .bar{height:5px}
+
+/* Sorteio */
+.pick{display:flex;flex-direction:column;margin-top:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.pick > .empty{border:0}
+.pick label{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding:11px 12px;cursor:pointer;min-width:0}
+.pick label:first-child{border-top:0}
+.pick label:has(input:checked){background:color-mix(in srgb,var(--pitch) 7%,transparent)}
+.pick label .ord{font:700 13px var(--display);color:var(--muted);min-width:26px;font-variant-numeric:tabular-nums}
+.ghead{font:700 13px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:10px 12px 6px;border-top:1px solid var(--line);background:var(--chalk)}
+.gform{display:grid;grid-template-columns:auto 1.4fr 1fr auto auto;gap:8px;align-items:center;margin-top:10px;background:var(--chalk);border-radius:10px;padding:10px 12px}
+.gform b{font:700 15px var(--display);text-transform:uppercase;letter-spacing:.04em}
+.gform .err-text{grid-column:1/-1;margin:0;min-height:0}
+@media (max-width:560px){.gform{grid-template-columns:1fr 1fr}.gform b,.gform input{grid-column:1/-1}}
+.res{margin-top:14px;background:var(--surface);border:1px dashed var(--line);border-radius:10px;padding:10px 12px}
+.res h3{margin:0;font:800 20px var(--display);text-transform:uppercase}
+.res ol{margin:8px 0 0;padding-left:22px}
+.res li{padding:2px 0}
+.pick label .ovrs{font:700 16px var(--display);color:var(--pitch);font-variant-numeric:tabular-nums;min-width:28px;text-align:right}
+.pick label span{min-width:0;overflow-wrap:anywhere;flex:1}
+.pick input{accent-color:var(--pitch);width:18px;height:18px;flex:none}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px;background:var(--chalk);border-radius:10px;padding:12px}
+.controls label{font-size:14px;display:flex;gap:6px;align-items:center}
+.teams{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:14px}
+.team{background:var(--surface);border:1px solid var(--line);border-top:6px solid var(--tc);border-radius:10px;padding:10px 12px;min-width:0}
+.team h3{margin:0;font:800 22px var(--display);text-transform:uppercase;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.team h3 small{font:600 13px var(--body);color:var(--muted);font-variant-numeric:tabular-nums}
+.team ol{margin:8px 0 6px;padding-left:20px}
+.team li{padding:2px 0;overflow-wrap:anywhere}
+.team li .n{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums;margin-left:6px}
+.team .tstats{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;border-top:1px solid var(--line);padding-top:6px}
+.copybox{width:100%;min-height:140px;margin-top:10px;font:13px ui-monospace,monospace;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px}
+
+/* Grupo (organizador) */
+.addbox{display:grid;grid-template-columns:1.4fr 1fr auto auto;gap:8px;background:var(--chalk);border-radius:10px;padding:12px}
+@media (max-width:560px){.addbox{grid-template-columns:1fr 1fr}.addbox input[type=text]{grid-column:1/-1}}
+.gtable{margin-top:12px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.grow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:10px 12px;border-top:1px solid var(--line);align-items:center}
+.grow:first-child{border-top:0}
+.grow .ph{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.chip{font:600 12px var(--body);padding:3px 8px;border-radius:999px;white-space:nowrap;justify-self:end}
+.chip.wait{background:var(--chalk);color:var(--muted)}
+.chip.go{background:color-mix(in srgb,var(--vest) 30%,transparent);color:var(--fg)}
+.chip.ok{background:color-mix(in srgb,var(--pitch) 18%,transparent);color:var(--ok)}
+.grow .acts{grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end}
+.summary{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.summary button{display:flex;align-items:baseline;gap:6px;font:500 14px var(--body);color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
+.summary button b{font:800 18px var(--display);font-variant-numeric:tabular-nums}
+.summary button[aria-pressed="true"]{background:var(--pitch);border-color:var(--pitch);color:var(--pitch-ink)}
+.gbar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--chalk);margin-top:12px}
+.gbar i{display:block;height:100%}
+.gfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+@media (prefers-reduced-motion:no-preference){.team,.ob{animation:in .25s ease both}.team:nth-child(2){animation-delay:.05s}.team:nth-child(3){animation-delay:.1s}.team:nth-child(4){animation-delay:.15s}}
+@keyframes in{from{transform:translateY(6px)}to{transform:none}}
+.wrap{padding-block:0 32px}
+.tip{position:relative;cursor:help;text-decoration:underline dotted;text-underline-offset:3px;text-decoration-color:var(--muted)}
+.tip:focus{outline:none}
+.tip:focus-visible{outline:2px solid var(--vest);outline-offset:2px;border-radius:2px}
+.tip:hover::after,.tip:focus::after{content:attr(data-tip);position:absolute;left:0;bottom:calc(100% + 6px);z-index:20;background:var(--fg);color:var(--bg);font:500 12px/1.35 var(--body);letter-spacing:0;text-transform:none;text-align:left;padding:6px 9px;border-radius:6px;width:max-content;max-width:220px;white-space:normal;box-shadow:0 4px 14px rgb(0 0 0 / .18);pointer-events:none}
+</style>
+</head>
+<body>
+<header class="top"><div class="in">
+  <div class="brand"><h1>Sorteio da Pelada</h1><span class="who"><span id="who"></span> <button class="mini" type="button" id="logoutBtn" hidden style="color:var(--pitch-ink)">Sair</button></span></div>
+  <nav class="tabs" role="tablist" id="tabs" hidden>
+    <button role="tab" id="tab-avaliar" data-tab="avaliar">Avaliar</button>
+    <button role="tab" id="tab-perfis" data-tab="perfis">Perfis</button>
+    <button role="tab" id="tab-sorteio" data-tab="sorteio">Sorteio</button>
+    <button role="tab" id="tab-grupo" data-tab="grupo" hidden>Grupo</button>
+  </nav>
+</div></header>
+
+<main class="wrap">
+  <div id="status" class="banner" hidden></div>
+  <section id="v-login"></section>
+  <section id="v-avaliar" hidden></section>
+  <section id="v-perfis" hidden>
+    <h2>Perfis do grupo</h2>
+    <p class="lead">Média das notas de todo o grupo. A nota geral é a média dos cinco quesitos (Defesa, Passe, Ataque, Resistência e Velocidade), cada um de 1 a 5. A autoavaliação de cada um também entra na média.</p>
+    <div class="cards" id="cards"></div>
+  </section>
+  <section id="v-sorteio" hidden>
+    <h2>Quem veio hoje</h2>
+    <p class="lead">Marque os presentes na ordem em que chegaram, defina quantos times e quantos titulares por time, e sorteie. Quem passar do número de titulares fica como reserva, na ordem de chegada. Zagueiros, meios e atacantes são divididos por igual entre os times. Quando uma posição não fecha certinho, o time com menos jogadores dela recebe alguém que o grupo votou como 2ª posição ali. As médias ficam o mais parecidas possível. Cada sorteio sai diferente.</p>
+    <div class="row"><button class="btn" id="allBtn" type="button">Marcar todos</button><button class="btn" id="noneBtn" type="button">Desmarcar todos</button><span class="note" id="presentCount"></span></div>
+    <div class="pick" id="pick"></div>
+    <form class="gform" id="guestForm" autocomplete="off">
+      <b>Convidado</b>
+      <input type="text" id="gName" maxlength="40" placeholder="Nome do convidado" aria-label="Nome do convidado">
+      <select id="gPos" aria-label="Posição do convidado"><option value="" disabled selected>Posição</option><option value="zag">Zagueiro</option><option value="mei">Meio</option><option value="ata">Atacante</option></select>
+      <select id="gLvl" aria-label="Nota do convidado"><option value="1">Nota 1</option><option value="2">Nota 2</option><option value="3" selected>Nota 3</option><option value="4">Nota 4</option><option value="5">Nota 5</option></select>
+      <button class="btn" type="submit">Adicionar</button>
+      <span class="err-text" id="gErr"></span>
+    </form>
+    <div class="controls">
+      <label for="nTeams">Times <select id="nTeams"><option>2</option><option>3</option><option>4</option></select></label>
+      <label for="perTeam">Titulares por time <select id="perTeam"><option>3</option><option>4</option><option selected>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option></select></label>
+      <button class="btn vest" id="drawBtn" type="button">Sortear</button>
+      <span class="note" id="drawHint"></span>
+    </div>
+    <div id="result"></div>
+  </section>
+  <section id="v-grupo" hidden>
+    <h2>Jogadores do grupo</h2>
+    <p class="lead">Cadastre cada jogador com nome, celular e posição principal. A posição secundária sai da votação do grupo na avaliação. Ele entra no app digitando o próprio celular e, no primeiro acesso, avalia todo o grupo antes de ver perfis e sorteio. O celular só aparece para organizadores.</p>
+    <form class="addbox" id="addForm" autocomplete="off">
+      <input type="text" id="newName" placeholder="Nome" maxlength="40" aria-label="Nome do jogador">
+      <input type="tel" id="newPhone" placeholder="(11) 98765-4321" inputmode="tel" maxlength="20" aria-label="Celular">
+      <select id="newPos" aria-label="Posição"><option value="" disabled selected>Posição</option><option value="zag">Zagueiro</option><option value="mei">Meio</option><option value="ata">Atacante</option></select>
+      <button class="btn primary" type="submit" id="addBtn">Adicionar</button>
+    </form>
+    <div class="err-text" id="addErr"></div>
+    <div class="gbar" id="gbar" aria-hidden="true"></div>
+    <div class="summary" id="summary" role="group" aria-label="Filtrar jogadores"></div>
+    <div class="gfoot"><span class="note" id="gnote"></span><button class="btn" type="button" id="copyMissing" hidden>Copiar nomes</button></div>
+    <div class="gtable" id="gtable"></div>
+  </section>
+</main>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

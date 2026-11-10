@@ -1,0 +1,59 @@
+rules_version = '2';
+// Regras do Sorteio da Pelada.
+// Cada aparelho entra com login anônimo e se liga a um jogador em claims/<uid>,
+// digitando um celular que está em phoneIndex. Organizadores ficam em admins/<+55...>.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signed() { return request.auth != null; }
+    function claimPath() { return /databases/$(database)/documents/claims/$(request.auth.uid); }
+    function hasClaim() { return signed() && exists(claimPath()); }
+    function claim() { return get(claimPath()).data; }
+    function isAdmin() { return hasClaim() && exists(/databases/$(database)/documents/admins/$(claim().phone)); }
+    function myPid() { return claim().pid; }
+    function idxPath(phone) { return /databases/$(database)/documents/phoneIndex/$(phone); }
+
+    // Lista de organizadores: criada à mão no Console. Só dá para consultar um número específico.
+    match /admins/{phone} {
+      allow get: if signed();
+      allow list, write: if false;
+    }
+
+    // Celular -> jogador. Qualquer aparelho consulta um número; só organizador lista e altera.
+    match /phoneIndex/{phone} {
+      allow get: if signed();
+      allow list, write: if isAdmin();
+    }
+
+    // Vínculo deste aparelho com um jogador.
+    match /claims/{uid} {
+      allow read, delete: if signed() && request.auth.uid == uid;
+      allow create, update: if signed() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['phone', 'pid', 'at'])
+        && request.resource.data.phone is string
+        && (
+          (request.resource.data.pid is string
+            && exists(idxPath(request.resource.data.phone))
+            && get(idxPath(request.resource.data.phone)).data.pid == request.resource.data.pid)
+          || exists(/databases/$(database)/documents/admins/$(request.resource.data.phone))
+        );
+    }
+
+    match /players/{pid} {
+      allow read: if hasClaim();
+      allow write: if isAdmin();
+    }
+
+    // Notas que cada jogador deu (o id do documento é o jogador que avaliou).
+    match /ratings/{pid} {
+      allow read: if hasClaim();
+      allow create, update: if hasClaim() && myPid() == pid
+        && request.resource.data.keys().hasOnly(['scores', 'raterPid', 'updatedAt']);
+      allow delete: if isAdmin() || (hasClaim() && myPid() == pid);
+    }
+
+    match /draws/{id} {
+      allow read: if hasClaim();
+      allow write: if isAdmin();
+    }
+  }
+}
