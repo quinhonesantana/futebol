@@ -3,7 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1f6b3a">
+<meta name="theme-color" content="#0a1d3d">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta property="og:title" content="Peixe Futebol Clube">
+<meta property="og:image" content="logo.jpg">
 <style>
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;font-size:14px;font-family:system-ui,sans-serif}
@@ -11,39 +16,46 @@ img{max-width:100%}
 [hidden]{display:none!important}
 .codein{font-size:26px!important;letter-spacing:.3em;text-align:center}
 </style>
-<title>Sorteio da Pelada</title>
+<title>Peixe Futebol Clube</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600&display=swap">
 <style>
 /* Layout: uma coluna estreita tipo app de celular; faixa verde fixa no topo com abas; cartões só onde há objeto (jogador, time). */
 :root{
-  --bg:#f3f5f1; --surface:#ffffff; --line:#d9ded5; --fg:#17201a; --muted:#5d6a60;
-  --pitch:#1f6b3a; --pitch-ink:#ffffff; --chalk:#e9efe6; --vest:#f2c230; --vest-ink:#2a2300;
-  --bad:#b3261e; --ok:#1f6b3a;
+  --bg:#f3f5f9; --surface:#ffffff; --line:#d6dce7; --fg:#111a2c; --muted:#596479;
+  --head:#0a1d3d; --head-ink:#ffffff;
+  --pitch:#123a78; --pitch-ink:#ffffff; --chalk:#e7ecf5; --vest:#d9a62b; --vest-ink:#241900;
+  --bad:#b3261e; --ok:#1d7a45;
   --t1:#2f6fd6; --t2:#e5702a; --t3:#2e9b55; --t4:#8a8f96;
   --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
   --body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#0f1511; --surface:#17201a; --line:#2b362e; --fg:#e8eee8; --muted:#9aa89d;
-  --pitch:#2f8a4e; --pitch-ink:#ffffff; --chalk:#1c2a20; --vest:#f2c230; --vest-ink:#2a2300;
+  --bg:#06112a; --surface:#0d1d3b; --line:#21365c; --fg:#e8eef9; --muted:#9aa8c2;
+  --head:#050f24; --head-ink:#ffffff;
+  --pitch:#2c63c4; --pitch-ink:#ffffff; --chalk:#13284b; --vest:#e8b83c; --vest-ink:#241900;
   --bad:#f2827a; --ok:#6fd08f; --t1:#5b93f0; --t2:#f08a4b; --t3:#4cc177; --t4:#b4b9c0; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0f1511; --surface:#17201a; --line:#2b362e; --fg:#e8eee8; --muted:#9aa89d;
-  --pitch:#2f8a4e; --pitch-ink:#ffffff; --chalk:#1c2a20; --vest:#f2c230; --vest-ink:#2a2300;
+  --bg:#06112a; --surface:#0d1d3b; --line:#21365c; --fg:#e8eef9; --muted:#9aa8c2;
+  --head:#050f24; --head-ink:#ffffff;
+  --pitch:#2c63c4; --pitch-ink:#ffffff; --chalk:#13284b; --vest:#e8b83c; --vest-ink:#241900;
   --bad:#f2827a; --ok:#6fd08f; --t1:#5b93f0; --t2:#f08a4b; --t3:#4cc177; --t4:#b4b9c0; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45}
-body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--pitch)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--head)}
 .wrap{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
-header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--pitch);color:var(--pitch-ink)}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--head);color:var(--head-ink);border-bottom:2px solid var(--vest)}
+.crest{display:flex;align-items:center;gap:10px;min-width:0}
+.crest img{width:44px;height:44px;border-radius:8px;flex:none}
+.hero-logo{display:flex;justify-content:center;margin-top:22px}
+.hero-logo img{width:min(190px,48vw);height:auto;border-radius:18px;box-shadow:0 10px 30px rgb(5 15 36 / .35)}
 header.top .in{max-width:720px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 0}
 .brand{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
 h1{font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:.01em;margin:0;text-transform:uppercase;line-height:1}
 .who{font-size:13px;opacity:.9}
 nav.tabs{display:flex;gap:2px;margin-top:12px;overflow-x:auto}
-nav.tabs button{flex:1;font:600 15px var(--display);letter-spacing:.06em;text-transform:uppercase;background:transparent;color:var(--pitch-ink);border:0;border-bottom:3px solid transparent;padding:10px 6px;cursor:pointer;opacity:.75;white-space:nowrap}
+nav.tabs button{flex:1;font:600 15px var(--display);letter-spacing:.06em;text-transform:uppercase;background:transparent;color:var(--head-ink);border:0;border-bottom:3px solid transparent;padding:10px 6px;cursor:pointer;opacity:.75;white-space:nowrap}
 nav.tabs button[aria-selected="true"]{opacity:1;border-bottom-color:var(--vest)}
 nav.tabs button:disabled{opacity:.4;cursor:default}
 nav.tabs button:focus-visible{outline:2px solid var(--vest);outline-offset:-2px}
@@ -229,6 +241,8 @@ input[type=text],input[type=tel],select{font:inherit;color:var(--fg);background:
 .rate.locked .dots button{opacity:.55;cursor:not-allowed}
 .notesbox{margin-top:16px;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .notesbox p{margin:0;font-size:14px;flex:1 1 220px}
+.visitor-head{margin-top:28px;padding-top:18px;border-top:1px solid var(--line)}
+.notesbox .acts2{display:flex;gap:8px;flex-wrap:wrap}
 .import{margin-top:18px;border:1px dashed var(--line);border-radius:10px;padding:10px 12px}
 .import summary{cursor:pointer;font:700 15px var(--display);text-transform:uppercase;letter-spacing:.04em}
 .import .row{margin-top:8px}
@@ -237,7 +251,7 @@ input[type=text],input[type=tel],select{font:inherit;color:var(--fg);background:
 </head>
 <body>
 <header class="top"><div class="in">
-  <div class="brand"><h1>Sorteio da Pelada</h1><span class="who"><span id="who"></span> <button class="mini" type="button" id="logoutBtn" hidden style="color:var(--pitch-ink)">Sair</button></span></div>
+  <div class="brand"><div class="crest"><img src="logo-128.jpg" alt="" width="44" height="44"><h1>Peixe Futebol Clube</h1></div><span class="who"><span id="who"></span> <button class="mini" type="button" id="logoutBtn" hidden style="color:var(--head-ink)">Sair</button></span></div>
   <nav class="tabs" role="tablist" id="tabs" hidden>
     <button role="tab" id="tab-avaliar" data-tab="avaliar">Avaliar</button>
     <button role="tab" id="tab-perfis" data-tab="perfis">Perfis</button>
@@ -249,9 +263,11 @@ input[type=text],input[type=tel],select{font:inherit;color:var(--fg);background:
 
 <main class="wrap">
   <div id="status" class="banner" hidden></div>
+  <div class="hero-logo" id="loginLogo" hidden><img src="logo.jpg" alt="Escudo do Peixe Futebol Clube" width="480" height="480"></div>
   <section id="v-login"></section>
   <section id="v-avaliar" hidden></section>
   <section id="v-perfis" hidden>
+    <p class="note visitor-head" id="visitorHead" hidden>Você está vendo como visitante. Entre com seu celular, acima, para avaliar e ver o sorteio.</p>
     <h2>Perfis do grupo</h2>
     <p class="lead">Média das notas de todo o grupo. A nota geral é a média dos cinco quesitos (Defesa, Passe, Ataque, Resistência e Velocidade), cada um de 1 a 5. A autoavaliação de cada um também entra na média.</p>
     <div class="cards" id="cards"></div>

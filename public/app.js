@@ -55,7 +55,9 @@ const youName=p=>p.id===myPid()?p.name+" (você)":p.name;
 function pending(){return others().filter(p=>!full(S.mine[p.id]))}
 function gated(){return !S.isAdmin&&!!myPid()&&pending().length>0}
 
+const EMPTY_PROFILE={avg:{def:null,pas:null,ata:null,res:null,vel:null},ovr:null,raters:0,sec:{key:null,votes:0,total:0,tie:null}};
 function profile(pid){
+  if(S.visitor)return S.pub?.[pid]||EMPTY_PROFILE;
   const sums={},cnt={},sc={};let raters=0;const prim=posOf(S.players.get(pid));
   const add=s=>{let any=false;if(POS[s.sec]&&s.sec!==prim)sc[s.sec]=(sc[s.sec]||0)+1;for(const [k] of ATTRS){const v=+s[k];if(v>=1&&v<=5){sums[k]=(sums[k]||0)+v;cnt[k]=(cnt[k]||0)+1;any=true}}if(any)raters++};
   for(const [uid,r] of S.ratings){if(uid===S.uid)continue;const s=r.scores[pid];if(s)add(s)}
@@ -73,8 +75,9 @@ document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",
 const VIEWS=["avaliar","perfis","sorteio","resultados","grupo"];
 function renderShell(){
   const me=myPid(),g=gated();
-  $("tabs").hidden=!me;$("v-login").hidden=!!me;
-  if(!me){for(const v of VIEWS)$("v-"+v).hidden=true;$("who").textContent="";return false}
+  $("tabs").hidden=!me;$("v-login").hidden=!!me;$("loginLogo").hidden=!!me;
+  if(!me){for(const v of VIEWS)$("v-"+v).hidden=!(S.visitor&&(v==="perfis"||v==="resultados"));$("visitorHead").hidden=!S.visitor;$("who").textContent="";return false}
+  $("visitorHead").hidden=true;
   $("tab-grupo").hidden=!S.isAdmin;
   for(const t of ["perfis","sorteio","resultados"]){$("tab-"+t).disabled=g;$("tab-"+t).title=g?"Libera depois que você avaliar todo o grupo":""}
   if((tab==="perfis"||tab==="sorteio"||tab==="resultados")&&g)tab="avaliar";
@@ -93,18 +96,18 @@ function renderLogin(){
   const v=$("v-login");
   if(L.built===L.step)return;L.built=L.step;
   if(!configured){v.replaceChildren(el("div",{class:"login"},el("h2",{text:"Falta configurar"}),el("p",{class:"lead",text:"Preencha o arquivo public/firebase-config.js com os dados do seu projeto Firebase e publique de novo."})));return}
-  if(L.step==="loading"){v.replaceChildren(el("div",{class:"login"},el("h2",{text:"Carregando"}),el("p",{class:"lead",text:"Abrindo o app da pelada…"})));return}
+  if(L.step==="loading"){v.replaceChildren(el("div",{class:"login"},el("h2",{text:"Carregando"}),el("p",{class:"lead",text:"Abrindo o app do Peixe…"})));return}
   const err=el("div",{class:"err-text",text:L.msg});
   if(L.step==="phone"){
     const inp=el("input",{type:"tel",id:"loginPhone",inputmode:"tel",autocomplete:"tel",placeholder:"(11) 98765-4321","aria-label":"Seu celular"});
     const btn=el("button",{class:"btn primary big",type:"submit",text:"Entrar"});
     const form=el("form",{class:"login",autocomplete:"off"},el("h2",{text:"Entre com seu celular"}),
-      el("p",{class:"lead",text:"Use o número que você passou para o organizador da pelada. Sem ele, o app não abre."}),inp,btn,err,
+      el("p",{class:"lead",text:"Use o número que você passou para o organizador do Peixe para avaliar o grupo e ver o sorteio."}),inp,btn,err,
       el("ol",{class:"steps"},
         el("li",{},el("b",{text:"1"}),"Você avalia cada jogador do grupo, um por vez."),
         el("li",{},el("b",{text:"2"}),"Suas notas entram na média e formam o perfil de cada um."),
         el("li",{},el("b",{text:"3"}),"Aí liberam os perfis e o sorteio dos times.")),
-      el("p",{class:"note",style:"margin:14px 0 0",text:"Depois de entrar uma vez, este aparelho já abre direto no seu cadastro."}));
+      el("p",{class:"note",style:"margin:14px 0 0",text:"Depois de entrar uma vez, este aparelho já abre direto no seu cadastro. Visitante? Role a página para ver os perfis e os resultados."}));
     form.addEventListener("submit",async e=>{e.preventDefault();err.textContent="";
       const d=normPhone(inp.value);if(!d){err.textContent="Digite o celular com DDD, por exemplo (11) 98765-4321.";return}
       btn.disabled=true;
@@ -365,7 +368,7 @@ $("drawBtn").addEventListener("click",()=>{
 });
 function teamStats(t){const f=t;const avg=key=>{const v=f.map(id=>{const p=rate(id);return key==="ovr"?(p.ovr??3):(p.avg[key]??p.ovr??3)});return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};return {ovr:avg("ovr"),attrs:ATTRS.map(([k,,c])=>[c,avg(k)])}}
 function dateBR(ts){return new Date(ts).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})}
-function waText(teams,at,res){let s=`⚽ Times da pelada (${dateBR(at)})\n`;teams.forEach((t,i)=>{const st=teamStats(t);s+=`\n*Time ${TEAMS[i][0]}* (média ${fmt(st.ovr)})\n`;t.forEach(id=>{const p=hasP(id)?{id,...getP(id)}:null;if(p)s+=`- ${dName(id)} (${posLabel(p)})\n`})});
+function waText(teams,at,res){let s=`⚽ Peixe Futebol Clube · times de ${dateBR(at)}\n`;teams.forEach((t,i)=>{const st=teamStats(t);s+=`\n*Time ${TEAMS[i][0]}* (média ${fmt(st.ovr)})\n`;t.forEach(id=>{const p=hasP(id)?{id,...getP(id)}:null;if(p)s+=`- ${dName(id)} (${posLabel(p)})\n`})});
   if(res.length){s+=`\n*Reservas* (entram por ordem de chegada)\n`;res.forEach((id,i)=>{const p={id,...getP(id)};s+=`${i+1}. ${dName(id)} (${posLabel(p)})\n`})}
   return s.trim()}
 function renderResult(){
@@ -426,8 +429,19 @@ function renderNotesBox(){
   const b=$("notesBox");if(!b)return;b.replaceChildren();
   const lk=!!S.notes.locked;
   b.append(el("p",{},el("b",{text:lk?"Notas travadas. ":"Notas liberadas. "}),lk?`Desde ${dateBR(S.notes.lockedAt||Date.now())}. Ninguém consegue mudar as notas que já deu, só completar as que faltam.`:`O grupo pode mudar as notas até a primeira partida do mês. Ela trava tudo sozinha quando você lança o primeiro jogo do mês.`),
-    confirmBtn(lk?"Abrir revisão de notas":"Travar notas agora",lk?"Toque de novo: todos poderão mudar as notas":"Toque de novo para travar",async()=>{
-      await S.db.doc("config/notes").set(lk?{locked:false,reviewAt:Date.now(),by:myPid()}:{locked:true,lockedAt:Date.now(),by:myPid()})},lk?"btn":"btn"));
+    el("div",{class:"acts2"},
+      confirmBtn(lk?"Abrir revisão de notas":"Travar notas agora",lk?"Toque de novo: todos poderão mudar as notas":"Toque de novo para travar",async()=>{
+        await S.db.doc("config/notes").set(lk?{locked:false,reviewAt:Date.now(),by:myPid()}:{locked:true,lockedAt:Date.now(),by:myPid()})},"btn"),
+      confirmBtn("Resetar todas as notas","Toque de novo: apaga as notas de todo o grupo",resetAllNotes,"btn")),
+    el("p",{class:"note",style:"flex-basis:100%",text:S.pubAt?`Página de visitantes atualizada em ${new Date(S.pubAt).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}.`:"A página de visitantes é atualizada sozinha quando um organizador está com o app aberto."}));
+}
+async function resetAllNotes(){
+  const ids=[...S.ratings.keys()];let n=0;
+  for(const id of ids){const r=S.ratings.get(id);if(!r||!Object.keys(r.scores||{}).length)continue;
+    await S.db.collection("ratings").doc(id).set({scores:{},raterPid:id,updatedAt:Date.now()});n++}
+  await S.db.doc("config/notes").set({locked:false,resetAt:Date.now(),by:myPid()});
+  S.mine={};S.savedMine={};S.dirty=false;S.obIdx=null;S.obDone=false;
+  status(`Notas resetadas: ${n} ${n===1?"avaliação apagada":"avaliações apagadas"}. Cada jogador vai avaliar o grupo de novo no próximo acesso.`);
 }
 function renderGrupo(){
   renderNotesBox();
@@ -440,7 +454,7 @@ function renderGrupo(){
   const notes={todos:total?`${cnt.ok} de ${total} já avaliaram todo o grupo. Faltam ${cnt.nao} entrar e ${cnt.aval} terminar de avaliar.`:"",nao:"Cadastrados que ainda não entraram no app.",aval:"Entraram, mas ainda não avaliaram todo o grupo. Os que estão mais atrasados aparecem primeiro.",ok:"Já deram nota para todos os jogadores."};
   $("gnote").textContent=notes[gFilter];
   const cm=$("copyMissing");cm.hidden=!(gFilter==="nao"||gFilter==="aval")||!shown.length;
-  cm.onclick=()=>{const txt=(gFilter==="nao"?"Ainda faltam entrar no app da pelada:\n":"Ainda faltam terminar a avaliação:\n")+shown.map(p=>{const x=st.get(p.id);return "- "+p.name+(gFilter==="aval"?` (${x.n}/${x.need})`:"")}).join("\n");
+  cm.onclick=()=>{const txt=(gFilter==="nao"?"Ainda faltam entrar no app do Peixe:\n":"Ainda faltam terminar a avaliação:\n")+shown.map(p=>{const x=st.get(p.id);return "- "+p.name+(gFilter==="aval"?` (${x.n}/${x.need})`:"")}).join("\n");
     const ok=()=>{cm.textContent="Copiado";setTimeout(()=>cm.textContent="Copiar nomes",1800)};
     try{navigator.clipboard.writeText(txt).then(ok,()=>status(txt))}catch(e){status(txt)}};
   if(!total){g.append(el("div",{class:"empty",style:"border:0"},el("strong",{text:"Grupo vazio"}),"Cadastre o primeiro jogador no formulário acima."));return}
@@ -608,7 +622,7 @@ function confirmBtn(label,confirmLabel,fn,cls){
 }
 
 /* ---------- render ---------- */
-function render(){if(!renderShell())return renderLogin();if(tab==="avaliar")renderAvaliar();else if(tab==="perfis")renderCards();else if(tab==="resultados")renderResultados();else if(tab==="sorteio")renderPick();else renderGrupo()}
+function render(){if(!renderShell()){renderLogin();if(S.visitor){renderCards();renderResultados()}return}if(tab==="avaliar")renderAvaliar();else if(tab==="perfis")renderCards();else if(tab==="resultados")renderResultados();else if(tab==="sorteio")renderPick();else renderGrupo()}
 
 /* ---------- início ---------- */
 let unsubs=[];
@@ -623,24 +637,42 @@ function startData(){
   const need=new Set(["players","ratings"]);
   const ready=n=>{if(need.delete(n)&&!need.size)S.loaded=true;render()};
   const fail=e=>{console.error(e);status("Não deu para carregar o grupo. Recarregue a página.",true)};
-  unsubs.push(S.db.collection("players").onSnapshot(s=>{S.players=new Map(s.docs.map(d=>[d.id,d.data()]));ready("players")},fail));
+  unsubs.push(S.db.collection("players").onSnapshot(s=>{S.players=new Map(s.docs.map(d=>[d.id,d.data()]));ready("players");schedulePub()},fail));
+  if(S.isAdmin)unsubs.push(S.db.doc("public/profiles").onSnapshot(d=>{S.pubLast=d.exists?JSON.stringify(d.data().p||{}):null;S.pubAt=d.exists?d.data().at:null;if(tab==="grupo")renderNotesBox();schedulePub()},fail));
   unsubs.push(S.db.collection("ratings").onSnapshot(s=>{
     S.ratings=new Map(s.docs.map(d=>{const x=d.data();return [d.id,{scores:x.scores||{},raterPid:x.raterPid}]}));
     S.claims=new Map(s.docs.map(d=>[d.id,d.id]));if(S.uid)S.claims.set(S.uid,S.uid);
-    if(S.uid){S.savedMine=JSON.parse(JSON.stringify(S.ratings.get(S.uid)?.scores||{}));if(!S.dirty)S.mine=JSON.parse(JSON.stringify(S.savedMine))}ready("ratings")},fail));
+    if(S.uid){S.savedMine=JSON.parse(JSON.stringify(S.ratings.get(S.uid)?.scores||{}));if(!S.dirty)S.mine=JSON.parse(JSON.stringify(S.savedMine))}ready("ratings");schedulePub()},fail));
   unsubs.push(S.db.doc("config/notes").onSnapshot(d=>{S.notes=d.exists?d.data():{locked:false};if(tab==="avaliar"&&!S.dirty)render();else if(tab==="grupo")renderNotesBox()},fail));
   unsubs.push(S.db.collection("matches").onSnapshot(s=>{S.matches=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.at-a.at);if(tab==="resultados"||tab==="perfis")render()},fail));
   unsubs.push(S.db.doc("draws/latest").onSnapshot(d=>{if(d.exists){const x=d.data();const teams=[];for(let i=0;i<(x.k||0);i++)teams.push(x.teams["t"+i]||[]);S.savedGuests=x.guests||{};S.saved={teams,res:x.res||[],at:x.at}}else S.saved=null;if(tab==="sorteio")renderResult()},fail));
   if(S.isAdmin)unsubs.push(S.db.collection("admins").onSnapshot(s=>{S.adminPhones=new Set(s.docs.map(d=>d.id));if(tab==="grupo")renderGrupo()},fail));
   if(S.isAdmin)unsubs.push(S.db.collection("phoneIndex").onSnapshot(s=>{S.phones=new Map(s.docs.map(d=>[d.data().pid,digitsOf(d.id)]));if(tab==="grupo")renderGrupo()},fail));
 }
-function resetState(){stopData();S.uid=null;S.isAdmin=S.isOwner=false;S.loaded=false;S.players=new Map();S.ratings=new Map();S.claims=new Map();S.phones=new Map();S.adminPhones=null;S.mine={};S.savedMine={};S.notes={locked:false};S.dirty=false;S.saved=null;S.draw=null;S.matches=[];MF=null}
+function resetState(){stopData();S.uid=null;S.isAdmin=S.isOwner=false;S.loaded=false;S.players=new Map();S.ratings=new Map();S.claims=new Map();S.phones=new Map();S.adminPhones=null;S.visitor=false;S.pub=null;S.pubLast=null;clearTimeout(pubTimer);S.mine={};S.savedMine={};S.notes={locked:false};S.dirty=false;S.saved=null;S.draw=null;S.matches=[];MF=null}
 /* Lê o vínculo deste aparelho (claims/<uid>) e decide para onde ir. */
+function startPublic(){
+  stopData();S.visitor=true;
+  const fail=e=>console.error(e);
+  unsubs.push(S.db.collection("players").onSnapshot(s=>{S.players=new Map(s.docs.map(d=>[d.id,d.data()]));render()},fail));
+  unsubs.push(S.db.collection("matches").onSnapshot(s=>{S.matches=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.at-a.at);render()},fail));
+  unsubs.push(S.db.doc("public/profiles").onSnapshot(d=>{S.pub=d.exists?d.data().p||{}:{};render()},fail));
+}
+/* Organizadores mantêm o resumo público (só médias) sempre que notas ou jogadores mudam. */
+let pubTimer=null;
+function schedulePub(){if(!S.isAdmin||!S.loaded)return;clearTimeout(pubTimer);pubTimer=setTimeout(publishPublic,2000)}
+async function publishPublic(){
+  if(!S.isAdmin||S.dirty)return;
+  const r2=x=>x==null?null:Math.round(x*100)/100;const p={};
+  for(const id of S.players.keys()){const x=profile(id);p[id]={avg:Object.fromEntries(ATTRS.map(([k])=>[k,r2(x.avg[k])])),ovr:r2(x.ovr),raters:x.raters,sec:x.sec}}
+  const js=JSON.stringify(p);if(js===S.pubLast)return;
+  try{await S.db.doc("public/profiles").set({p,at:Date.now()});S.pubLast=js}catch(e){console.error(e)}
+}
 async function boot(){
   resetState();status("");setStep("loading");
   try{
     const c=await getDoc(claimRef());
-    if(!c.exists()){$("logoutBtn").hidden=true;setStep("phone");return}
+    if(!c.exists()){$("logoutBtn").hidden=true;setStep("phone");startPublic();return}
     const cl=c.data();L.phone=cl.phone;$("logoutBtn").hidden=false;
     S.isAdmin=S.isOwner=(await getDoc(doc(fs,"admins",cl.phone))).exists();
     if(!cl.pid){if(S.isAdmin){startData();setStep("register")}else{await deleteDoc(claimRef());setStep("phone")}return}

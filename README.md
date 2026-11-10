@@ -1,4 +1,7 @@
-# Sorteio da Pelada
+# Peixe Futebol Clube
+
+<img src="public/logo.jpg" alt="Escudo do Peixe Futebol Clube" width="160">
+
 
 App web para o futebol semanal do grupo:
 - **Avaliação:** cada jogador avalia todo o grupo em cinco atributos (Defesa, Passe, Ataque, Resistência e Velocidade, de 1 a 5) e, se quiser, vota na posição secundária ideal de cada um (opcional).
@@ -77,6 +80,9 @@ Firebase → **Authentication** → **Configurações** → **Domínios autoriza
 | Cadastrar, importar e remover jogadores | Sim | Não |
 | Ver celulares | Sim | Não |
 | Tornar ou tirar organizador | Sim (menos a si mesmo) | Não |
+| Resetar as notas de todo o grupo | Sim (Grupo → Resetar todas as notas) | Não |
+
+**Visitantes** (quem abre o link sem entrar) veem, na tela de login, os perfis com as médias e a aba de resultados. Eles não veem o sorteio, os celulares nem quem deu qual nota. O resumo dos perfis é atualizado sozinho sempre que um organizador está com o app aberto.
 
 O sorteio feito por um organizador fica só na tela dele, como prévia, até ele tocar em **Publicar sorteio**.
 
