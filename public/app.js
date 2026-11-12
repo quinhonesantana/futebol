@@ -70,9 +70,12 @@ function profile(pid){
 
 /* ---------- abas ---------- */
 let tab=ls("tab")||"avaliar";
-function setTab(t){tab=t;ls("tab",t);render()}
+/* avisa o Tag Manager de cada aba aberta, já que o app não troca de página */
+const TAB_NAMES={perfis:"jogadores",aovivo:"ao_vivo"};
+function track(name){try{(window.dataLayer=window.dataLayer||[]).push({event:"aba_aberta",aba:TAB_NAMES[name]||name,visitante:!myPid()})}catch(e){}}
+function setTab(t){tab=t;ls("tab",t);track(t);render()}
 let vtab=ls("vtab")||"entrar";
-document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>{if(!myPid()){vtab=b.dataset.tab;ls("vtab",vtab);render();window.scrollTo({top:0});return}setTab(b.dataset.tab)}));
+document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>{if(!myPid()){vtab=b.dataset.tab;ls("vtab",vtab);track(vtab);render();window.scrollTo({top:0});return}setTab(b.dataset.tab)}));
 const VIEWS=["avaliar","perfis","sorteio","aovivo","resultados","grupo"];
 function renderShell(){
   const me=myPid(),g=gated();
