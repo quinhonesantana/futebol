@@ -374,38 +374,54 @@ function balance(ids,k){
 }
 $("drawBtn").addEventListener("click",()=>{
   const ids=[...present].filter(id=>hasP(id));const k=+$("nTeams").value,need=k*+$("perTeam").value;if(ids.length<k*2)return;
-  S.draw={teams:balance(ids.slice(0,need),k),res:ids.slice(need),at:Date.now()};renderResult();
+  const teams=balance(ids.slice(0,need),k),res=ids.slice(need);
+  S.draw=k===2&&res.length?{teams,res:[],subs:splitReserves(teams,res),at:Date.now()}:{teams,res,subs:null,at:Date.now()};renderResult();
   $("result").scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"});
 });
+/* Com 2 times o jogo é direto e as trocas são no campo: cada time leva os seus reservas.
+   Reparte os reservas (o mais forte primeiro) mantendo o número igual, as posições equilibradas
+   e a força total dos dois times parecida. Dentro de cada time, eles ficam na ordem de chegada. */
+function splitReserves(teams,res){
+  const subs=teams.map(()=>[]);const ovr=id=>rate(id).ovr??3;
+  const power=i=>[...teams[i],...subs[i]].reduce((q,id)=>q+ovr(id),0);
+  for(const id of [...res].sort((a,b)=>ovr(b)-ovr(a))){
+    const n=subs.map(x=>x.length),min=Math.min(...n);let cand=[...subs.keys()].filter(i=>n[i]===min);
+    const pos=posOf(getP(id)),cnt=i=>[...teams[i],...subs[i]].filter(x=>posOf(getP(x))===pos).length;
+    const mc=Math.min(...cand.map(cnt));cand=cand.filter(i=>cnt(i)===mc).sort((a,b)=>power(a)-power(b));
+    subs[cand[0]].push(id)}
+  for(const x of subs)x.sort((a,b)=>res.indexOf(a)-res.indexOf(b));
+  return subs;
+}
 function teamStats(t){const f=t;const avg=key=>{const v=f.map(id=>{const p=rate(id);return key==="ovr"?(p.ovr??3):(p.avg[key]??p.ovr??3)});return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};return {ovr:avg("ovr"),attrs:ATTRS.map(([k,,c])=>[c,avg(k)])}}
 function dateBR(ts){return new Date(ts).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})}
-function waText(teams,at,res){let s=`⚽ Peixe Futebol Clube · times de ${dateBR(at)}\n`;teams.forEach((t,i)=>{const st=teamStats(t);s+=`\n*Time ${TEAMS[i][0]}* (média ${fmt(st.ovr)})\n`;t.forEach(id=>{const p=hasP(id)?{id,...getP(id)}:null;if(p)s+=`- ${dName(id)} (${posLabel(p)})\n`})});
+function waText(teams,at,res,subs){let s=`⚽ Peixe Futebol Clube · times de ${dateBR(at)}\n`;teams.forEach((t,i)=>{const st=teamStats(t);s+=`\n*Time ${TEAMS[i][0]}* (média ${fmt(st.ovr)})\n`;t.forEach(id=>{const p=hasP(id)?{id,...getP(id)}:null;if(p)s+=`- ${dName(id)} (${posLabel(p)})\n`});const sb=(subs&&subs[i])||[];if(sb.length)s+=`_Reservas:_ ${sb.map(id=>`${dName(id)} (${posLabel({id,...getP(id)})})`).join(", ")}\n`});
   if(res.length){s+=`\n*Reservas* (entram por ordem de chegada)\n`;res.forEach((id,i)=>{const p={id,...getP(id)};s+=`${i+1}. ${dName(id)} (${posLabel(p)})\n`})}
   return s.trim()}
 function renderResult(){
   const r=$("result");r.replaceChildren();
   const d=(S.isAdmin&&S.draw)||S.saved;
   if(!d){if(!S.isAdmin)r.append(el("div",{class:"empty",style:"margin-top:24px"},el("strong",{text:"Sorteio ainda não publicado"}),"Quando os organizadores publicarem os times, eles aparecem aqui."));return}
-  const teams=d.teams.map(t=>t.filter(id=>hasP(id)));const res=(d.res||[]).filter(id=>hasP(id));
+  const teams=d.teams.map(t=>t.filter(id=>hasP(id)));const res=(d.res||[]).filter(id=>hasP(id));const subs=d.subs?teams.map((_,i)=>(d.subs[i]||[]).filter(id=>hasP(id))):null;
   r.append(el("h2",{text:S.draw?"Times sorteados":"Sorteio publicado"}));
   if(S.draw)r.append(el("p",{class:"lead",text:"Prévia: só você está vendo. Toque em Publicar sorteio para mostrar ao grupo, ou sorteie de novo."}));
   else r.append(el("p",{class:"lead",text:`Publicado pelos organizadores em ${dateBR(d.at)}.`}));
   const grid=el("div",{class:"teams"});
   teams.forEach((t,i)=>{const st=teamStats(t);
     grid.append(el("div",{class:"team",style:`--tc:var(${TEAMS[i][1]})`},
-      el("h3",{},"Time "+TEAMS[i][0],el("small",{text:`média ${fmt(st.ovr)} · ${t.length} jog.`})),
+      el("h3",{},"Time "+TEAMS[i][0],el("small",{text:`média ${fmt(st.ovr)} · ${t.length} jog.${subs&&subs[i].length?` + ${subs[i].length} res.`:""}`})),
       el("ol",{},...t.map(id=>{const p={id,...getP(id)};const pr=rate(id);return el("li",{},dName(id)," ",posTag(p,true),el("span",{class:"n",text:fmt(pr.ovr)}))})),
+      subs&&subs[i].length?el("div",{class:"tsubs"},el("b",{text:"Reservas do time"}),el("ul",{},...subs[i].map(id=>{const p={id,...getP(id)};return el("li",{},dName(id)," ",posTag(p,true),el("span",{class:"n",text:fmt(rate(id).ovr)}))}))):null,
       el("div",{class:"tstats"},...st.attrs.flatMap(([c,v],i)=>[i?"  ·  ":"",tip(ATTRS[i][0],c)," "+fmt(v)]))))});
   r.append(grid);
   if(res.length)r.append(el("div",{class:"res"},el("h3",{text:`Reservas (${res.length})`}),el("p",{class:"note",style:"margin:2px 0 0",text:"Entram por ordem de chegada."}),
     el("ol",{},...res.map(id=>{const p={id,...getP(id)};return el("li",{},dName(id)," ",posTag(p,true))}))));
   const acts=el("div",{class:"row",style:"margin-top:12px"});
   const box=el("textarea",{class:"copybox",id:"waBox",readonly:true,hidden:true,"aria-label":"Texto para copiar"});
-  acts.append(el("button",{class:"btn primary",type:"button",text:"Copiar para o WhatsApp",onclick:ev=>{const txt=waText(teams,d.at,res);box.value=txt;const b=ev.currentTarget;
+  acts.append(el("button",{class:"btn primary",type:"button",text:"Copiar para o WhatsApp",onclick:ev=>{const txt=waText(teams,d.at,res,subs);box.value=txt;const b=ev.currentTarget;
     const ok=()=>{b.textContent="Copiado";setTimeout(()=>b.textContent="Copiar para o WhatsApp",1800)};const fb=()=>{box.hidden=false;box.select()};
     try{navigator.clipboard.writeText(txt).then(ok,fb)}catch(e){fb()}}}));
   if(S.draw&&S.isAdmin)acts.append(el("button",{class:"btn",type:"button",text:"Publicar sorteio",onclick:async ev=>{const b=ev.currentTarget;b.disabled=true;
-    try{await S.db.doc("draws/latest").set({teams:Object.fromEntries(teams.map((t,i)=>["t"+i,t])),k:teams.length,res,guests:Object.fromEntries([...teams.flat(),...res].filter(isGuest).map(id=>{const g=getP(id);return [id,{name:g.name,pos:g.pos,lvl:+g.lvl||3}]})),at:d.at});b.textContent="Publicado para todos";status("Sorteio publicado. Todo o grupo já vê os times na aba Sorteio.")}catch(e){b.disabled=false;status(e.code==="permission-denied"?"Só organizadores podem publicar o sorteio.":"Não foi possível publicar o sorteio.",true)}}}));
+    try{await S.db.doc("draws/latest").set({teams:Object.fromEntries(teams.map((t,i)=>["t"+i,t])),k:teams.length,res,subs:subs?Object.fromEntries(subs.map((x,i)=>["t"+i,x])):null,guests:Object.fromEntries([...teams.flat(),...res,...(subs||[]).flat()].filter(isGuest).map(id=>{const g=getP(id);return [id,{name:g.name,pos:g.pos,lvl:+g.lvl||3}]})),at:d.at});b.textContent="Publicado para todos";status("Sorteio publicado. Todo o grupo já vê os times na aba Sorteio.")}catch(e){b.disabled=false;status(e.code==="permission-denied"?"Só organizadores podem publicar o sorteio.":"Não foi possível publicar o sorteio.",true)}}}));
   if(S.isAdmin&&S.saved){const running=S.live&&S.live.drawAt===S.saved.at&&S.live.status==="running";
     acts.append(confirmBtn(S.draw?"Cancelar sorteio publicado":"Cancelar publicação",running?"Toque de novo: cancela e para a partida ao vivo sem salvar":"Toque de novo: o grupo deixa de ver os times",cancelPublish,"btn danger"))}
   r.append(acts,box,el("p",{class:"note",style:"margin-top:8px",text:"O número ao lado do nome é a nota geral do perfil."}));
@@ -528,7 +544,7 @@ function perfLine(pid){const x=stats().get(pid);if(!x||!x.j)return null;
 const tName=i=>"Time "+TEAMS[i][0];
 function newMF(){const d=S.saved;if(!d||d.teams.length<2)return null;
   return {a:0,b:1,extraA:[],extraB:[],g:{},ownA:0,ownB:0,drawAt:d.at}}
-function rosterOf(side){const d=S.saved;const i=side==="A"?MF.a:MF.b;return [...(d.teams[i]||[]),...(side==="A"?MF.extraA:MF.extraB)].filter(hasP)}
+function rosterOf(side){const d=S.saved;const i=side==="A"?MF.a:MF.b;return [...(d.teams[i]||[]),...((d.subs||[])[i]||[]),...(side==="A"?MF.extraA:MF.extraB)].filter(hasP)}
 function sideGoals(side){return rosterOf(side).reduce((q,id)=>q+(MF.g[id]||0),0)+(side==="A"?MF.ownA:MF.ownB)}
 function stepper(val,onChange,label){
   const out=el("output",{text:String(val)});
@@ -615,7 +631,9 @@ function lvState(){
   const L=S.live;if(L&&S.saved&&L.drawAt===S.saved.at)return L;
   const fmt=lvFmt();return {drawAt:S.saved?.at,fmt,status:fmt==="2"?"ready":"setup",a:fmt==="2"?0:null,b:fmt==="2"?1:null,queue:[],streak:{},gameNo:0,events:[],startedAt:null,sessionStart:null,dur:fmt==="2"?LV.SESSION:LV.MATCH3,fresh:true}}
 function lvOpen(){if(!S.saved)return false;const L=lvState();if(L.status==="running")return true;if((L.forceUntil||0)>Date.now())return true;return lvWindow(Date.now()).open}
-const lvTeam=i=>({name:TEAMS[i][0],c:`var(${TEAMS[i][1]})`,ids:(S.saved.teams[i]||[]).filter(hasP)});
+const lvIds=i=>[...(S.saved.teams[i]||[]),...((S.saved.subs||[])[i]||[])].filter(hasP);
+const lvIsSub=(i,id)=>((S.saved.subs||[])[i]||[]).includes(id);
+const lvTeam=i=>({name:TEAMS[i][0],c:`var(${TEAMS[i][1]})`,ids:lvIds(i)});
 function lvElapsed(L){return L.status==="running"&&L.startedAt?Math.max(0,(Date.now()-L.startedAt)/1000):0}
 function lvRemaining(L){return Math.max(0,(L.dur||LV.MATCH3)-lvElapsed(L))}
 const lvMin=L=>Math.min(Math.ceil((L.dur||0)/60),Math.floor(lvElapsed(L)/60)+1);
@@ -654,10 +672,10 @@ async function lvEnd(expectedGame,chosenOut){
   const ok=await lvTx(async(tx,L)=>{
     if(!L||L.drawAt!==S.saved.at||L.status!=="running"||(L.gameNo||0)!==expectedGame)throw new Error("lv:Essa partida já foi encerrada em outro celular.");
     const ga=lvGoals(L,"a"),gb=lvGoals(L,"b");const goalsEv=(L.events||[]).filter(e=>e.kind==="goal");
-    const side=t=>{const ids=(S.saved.teams[t]||[]).filter(hasP);const own=goalsEv.filter(e=>e.team===t&&(e.own||e.scorer==="?")).length;return {team:t,roster:ids,goals:goalsEv.filter(e=>e.team===t).length,own}};
+    const side=t=>{const ids=lvIds(t);const own=goalsEv.filter(e=>e.team===t&&(e.own||e.scorer==="?")).length;return {team:t,roster:ids,goals:goalsEv.filter(e=>e.team===t).length,own}};
     const scorers={};for(const e of goalsEv)if(!e.own&&e.scorer&&e.scorer!=="?")scorers[e.scorer]=(scorers[e.scorer]||0)+1;
     const assists={};for(const e of goalsEv)if(e.assist)assists[e.assist]=(assists[e.assist]||0)+1;
-    const names={};for(const t of [L.a,L.b])for(const id of (S.saved.teams[t]||[]))if(hasP(id))names[id]=getP(id).name;
+    const names={};for(const t of [L.a,L.b])for(const id of lvIds(t))names[id]=getP(id).name;
     const minutes=Math.round(Math.min(L.dur,(now-L.startedAt)/1000)/60);
     tx.set(doc(collection(fs,"matches")),{at:now,drawAt:S.saved.at,a:side(L.a),b:side(L.b),scorers,assists,names,minutes,source:"live",by:myPid(),events:goalsEv.map(e=>({team:e.team,scorer:e.scorer,assist:e.assist||null,own:!!e.own,min:e.min,by:e.by}))});
     if(L.fmt==="2"){tx.set(liveRef(),{...L,status:"done",gameNo:(L.gameNo||0)+1,endedAt:now});summary=`Pelada encerrada: ${TEAMS[L.a][0]} ${ga} x ${gb} ${TEAMS[L.b][0]}. O resultado já está na aba Resultados.`;return}
@@ -708,7 +726,7 @@ function lvOpenEnd(L){
 }
 function lvRoster(t,L,goalsById){const T=lvTeam(t);
   return el("div",{class:"lv-roster",style:`--tc:${T.c}`},el("h3",{text:T.name}),el("ul",{},...T.ids.map(id=>{const g=goalsById[id]||0;const p={id,...getP(id)};
-    return el("li",{},posTag(p,true),el("span",{class:"n",text:dName(id)}),g?el("span",{class:"lv-balls",text:g+(g>1?" gols":" gol")}):null)})))}
+    return el("li",{},posTag(p,true),el("span",{class:"n",text:dName(id)}),lvIsSub(t,id)?el("span",{class:"lv-sub",text:"reserva"}):null,g?el("span",{class:"lv-balls",text:g+(g>1?" gols":" gol")}):null)})))}
 function lvWaiting(box){
   const w=lvWindow(Date.now());const when=new Date(w.next);
   const cd=el("div",{class:"lv-cd",id:"lvCountdown"});
@@ -861,7 +879,7 @@ function startData(){
   unsubs.push(S.db.doc("config/notes").onSnapshot(d=>{S.notes=d.exists?d.data():{locked:false};if(tab==="avaliar"&&!S.dirty)render();else if(tab==="grupo")renderNotesBox()},fail));
   unsubs.push(S.db.collection("matches").onSnapshot(s=>{S.matches=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.at-a.at);if(tab==="resultados"||tab==="perfis"||tab==="aovivo")render()},fail));
   unsubs.push(onSnapshot(doc(fs,"live","current"),d=>{S.live=d.exists()?d.data():null;if(tab==="aovivo")renderAoVivo()},fail));
-  unsubs.push(S.db.doc("draws/latest").onSnapshot(d=>{if(d.exists){const x=d.data();const teams=[];for(let i=0;i<(x.k||0);i++)teams.push(x.teams["t"+i]||[]);S.savedGuests=x.guests||{};S.saved={teams,res:x.res||[],at:x.at}}else S.saved=null;if(tab==="sorteio")renderResult();else if(tab==="aovivo")renderAoVivo()},fail));
+  unsubs.push(S.db.doc("draws/latest").onSnapshot(d=>{if(d.exists){const x=d.data();const teams=[];for(let i=0;i<(x.k||0);i++)teams.push(x.teams["t"+i]||[]);S.savedGuests=x.guests||{};S.saved={teams,res:x.res||[],subs:x.subs?teams.map((_,i)=>x.subs["t"+i]||[]):null,at:x.at}}else S.saved=null;if(tab==="sorteio")renderResult();else if(tab==="aovivo")renderAoVivo()},fail));
   if(S.isAdmin)unsubs.push(S.db.collection("admins").onSnapshot(s=>{S.adminPhones=new Set(s.docs.map(d=>d.id));if(tab==="grupo")renderGrupo()},fail));
   if(S.isAdmin)unsubs.push(S.db.collection("phoneIndex").onSnapshot(s=>{S.phones=new Map(s.docs.map(d=>[d.data().pid,digitsOf(d.id)]));if(tab==="grupo")renderGrupo()},fail));
 }

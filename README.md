@@ -6,7 +6,7 @@
 App web para o futebol semanal do grupo:
 - **Avaliação:** cada jogador avalia todo o grupo em cinco atributos (Defesa, Passe, Ataque, Resistência e Velocidade, de 1 a 5) e, se quiser, vota na posição secundária ideal de cada um (opcional).
 - **Jogadores:** as médias de todas as avaliações viram o perfil de cada jogador.
-- **Sorteio:** o app monta times equilibrados por posição (zagueiro, meio, atacante) e por nota. Você define quantos times e quantos titulares por time, e quem sobra fica de reserva. Também dá para incluir convidados.
+- **Sorteio:** o app monta times equilibrados por posição (zagueiro, meio, atacante) e por nota. Você define quantos times e quantos titulares por time, e quem sobra fica de reserva: com 3 ou mais times, numa fila única por ordem de chegada; com 2 times, os reservas são divididos entre os dois, equilibrando posição e nota. Também dá para incluir convidados.
 
 **Tecnologias:** HTML, CSS e JavaScript puros, sem etapa de build. O site é hospedado no Netlify; os dados ficam no Firebase (Firestore e login anônimo pelo celular).
 
