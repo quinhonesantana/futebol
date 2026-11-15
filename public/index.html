@@ -343,6 +343,8 @@ button.btn.lv-end{width:100%;margin-top:10px;background:var(--vest);border-color
 .lv-sum i{width:14px;height:14px;border-radius:4px;background:var(--tc)}
 .lv-rule{background:var(--chalk);border-radius:10px;padding:10px 12px;font-size:14px}
 .lv-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--head);color:var(--head-ink);border:1px solid var(--vest);border-radius:12px;padding:10px 14px;font-size:14px;max-width:min(92%,460px);box-shadow:0 10px 30px rgb(0 0 0 / .3)}
+.team li .n.top{color:var(--vest);font-weight:700}
+.topline{font:600 12px var(--body);color:var(--muted);margin-top:2px}
 .tsubs{border-top:1px dashed var(--line);margin-top:6px;padding-top:6px}
 .tsubs b{font:700 12px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .tsubs ul{margin:4px 0 6px;padding-left:20px}
@@ -388,7 +390,7 @@ button.btn.lv-end{width:100%;margin-top:10px;background:var(--vest);border-color
   <section id="v-sorteio" hidden>
     <div id="drawTools">
     <h2>Quem veio hoje</h2>
-    <p class="lead">Marque os presentes na ordem em que chegaram, defina quantos times e quantos titulares por time, e sorteie. Quem passar do número de titulares fica como reserva, na ordem de chegada. Zagueiros, meios e atacantes são divididos por igual entre os times. Quando uma posição não fecha certinho, o time com menos jogadores dela recebe alguém que o grupo votou como 2ª posição ali. As médias ficam o mais parecidas possível. Cada sorteio sai diferente.</p>
+    <p class="lead">Marque os presentes na ordem em que chegaram, defina quantos times e quantos titulares por time, e sorteie. Quem passar do número de titulares fica como reserva, na ordem de chegada. Os jogadores nível 4 (nota geral 4,0 ou mais) são espalhados entre os times, para não juntar os melhores no mesmo time. Zagueiros, meios e atacantes também são divididos por igual. Quando uma posição não fecha certinho, o time com menos jogadores dela recebe alguém que o grupo votou como 2ª posição ali. As médias ficam o mais parecidas possível. Cada sorteio sai diferente.</p>
     <div class="row"><button class="btn" id="allBtn" type="button">Marcar todos</button><button class="btn" id="noneBtn" type="button">Desmarcar todos</button><span class="note" id="presentCount"></span></div>
     <div class="pick" id="pick"></div>
     <form class="gform" id="guestForm" autocomplete="off">

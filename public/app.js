@@ -340,13 +340,16 @@ $("guestForm").addEventListener("submit",e=>{
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
 function balance(ids,k){
   const usePerf=$("usePerf").checked;const adjMap=usePerf?perfAdj():new Map();
-  const info=new Map(ids.map(id=>{const pr=rate(id);const v={ovr:pr.ovr??3};for(const [a] of ATTRS)v[a]=pr.avg[a]??v.ovr;const pl=getP(id);const a=usePerf?(adjMap.get(id)||0):0;for(const k in v)v[k]+=a;return [id,{...v,pos:posOf(pl),pos2:pr.sec.key}]}));
+  const info=new Map(ids.map(id=>{const pr=rate(id);const v={ovr:pr.ovr??3};for(const [a] of ATTRS)v[a]=pr.avg[a]??v.ovr;const pl=getP(id);const a=usePerf?(adjMap.get(id)||0):0;for(const k in v)v[k]+=a;return [id,{...v,pos:posOf(pl),pos2:pr.sec.key,top:isTop(id)}]}));
+  const nTop=ids.filter(id=>info.get(id).top).length;
   const able={};for(const ps of POS_KEYS)able[ps]=ids.filter(id=>info.get(id).pos===ps||info.get(id).pos2===ps).length>=k;
   const keys=["ovr",...ATTRS.map(a=>a[0])];
   const M={};for(const key of keys)M[key]=ids.reduce((s,id)=>s+info.get(id)[key],0)/ids.length;
   function cost(teams){let c=0;
     for(const t of teams){for(const key of keys){const m=t.reduce((s,id)=>s+info.get(id)[key],0)/t.length;c+=(m-M[key])**2*(key==="ovr"?4:.6)}}
     const sizes=teams.map(t=>t.length);if(Math.max(...sizes)-Math.min(...sizes)>1)c+=50;
+    /* nível 4 espalhado: no máximo 1 de diferença entre os times, e todo time com pelo menos 1 quando houver para todos */
+    if(nTop){const tp=teams.map(t=>t.filter(id=>info.get(id).top).length);if(Math.max(...tp)-Math.min(...tp)>1)c+=80;if(nTop>=k&&tp.some(x=>x===0))c+=80}
     for(const ps of POS_KEYS){
       const n=teams.map(t=>t.filter(id=>info.get(id).pos===ps).length);if(Math.max(...n)-Math.min(...n)>1)c+=6;
       const cov=teams.map((t,i)=>n[i]+t.filter(id=>info.get(id).pos2===ps).length*.5);const mc=cov.reduce((a,b)=>a+b,0)/k;c+=cov.reduce((q,x)=>q+(x-mc)**2,0)*.5;
@@ -357,6 +360,7 @@ function balance(ids,k){
     const teams=Array.from({length:k},()=>[]);
     for(const ps of shuffle([...POS_KEYS])){for(const id of shuffle(ids.filter(id=>info.get(id).pos===ps))){
       const min=Math.min(...teams.map(t=>t.length));let opts=teams.filter(t=>t.length===min);
+      if(info.get(id).top){const tc=t=>t.filter(x=>info.get(x).top).length;const mt=Math.min(...opts.map(tc));opts=opts.filter(t=>tc(t)===mt)}
       const cnt=t=>t.filter(x=>info.get(x).pos===ps).length;const mc=Math.min(...opts.map(cnt));opts=opts.filter(t=>cnt(t)===mc);
       opts[Math.random()*opts.length|0].push(id)}}
     let best=cost(teams),improved=true,guard=0;
@@ -381,11 +385,14 @@ $("drawBtn").addEventListener("click",()=>{
 /* Com 2 times o jogo é direto e as trocas são no campo: cada time leva os seus reservas.
    Reparte os reservas (o mais forte primeiro) mantendo o número igual, as posições equilibradas
    e a força total dos dois times parecida. Dentro de cada time, eles ficam na ordem de chegada. */
+const TOP=4;
+const isTop=id=>(rate(id).ovr??0)>=TOP;
 function splitReserves(teams,res){
   const subs=teams.map(()=>[]);const ovr=id=>rate(id).ovr??3;
   const power=i=>[...teams[i],...subs[i]].reduce((q,id)=>q+ovr(id),0);
   for(const id of [...res].sort((a,b)=>ovr(b)-ovr(a))){
     const n=subs.map(x=>x.length),min=Math.min(...n);let cand=[...subs.keys()].filter(i=>n[i]===min);
+    if(isTop(id)){const tc=i=>[...teams[i],...subs[i]].filter(isTop).length;const mt=Math.min(...cand.map(tc));cand=cand.filter(i=>tc(i)===mt)}
     const pos=posOf(getP(id)),cnt=i=>[...teams[i],...subs[i]].filter(x=>posOf(getP(x))===pos).length;
     const mc=Math.min(...cand.map(cnt));cand=cand.filter(i=>cnt(i)===mc).sort((a,b)=>power(a)-power(b));
     subs[cand[0]].push(id)}
@@ -409,7 +416,8 @@ function renderResult(){
   teams.forEach((t,i)=>{const st=teamStats(t);
     grid.append(el("div",{class:"team",style:`--tc:var(${TEAMS[i][1]})`},
       el("h3",{},"Time "+TEAMS[i][0],el("small",{text:`média ${fmt(st.ovr)} · ${t.length} jog.${subs&&subs[i].length?` + ${subs[i].length} res.`:""}`})),
-      el("ol",{},...t.map(id=>{const p={id,...getP(id)};const pr=rate(id);return el("li",{},dName(id)," ",posTag(p,true),el("span",{class:"n",text:fmt(pr.ovr)}))})),
+      (()=>{const n=[...t,...(subs?subs[i]:[])].filter(isTop).length;return n?el("div",{class:"topline",text:`${n} ${n===1?"jogador":"jogadores"} nível 4`}):null})(),
+      el("ol",{},...t.map(id=>{const p={id,...getP(id)};const pr=rate(id);return el("li",{},dName(id)," ",posTag(p,true),el("span",{class:"n"+(isTop(id)?" top":""),text:fmt(pr.ovr)}))})),
       subs&&subs[i].length?el("div",{class:"tsubs"},el("b",{text:"Reservas do time"}),el("ul",{},...subs[i].map(id=>{const p={id,...getP(id)};return el("li",{},dName(id)," ",posTag(p,true),el("span",{class:"n",text:fmt(rate(id).ovr)}))}))):null,
       el("div",{class:"tstats"},...st.attrs.flatMap(([c,v],i)=>[i?"  ·  ":"",tip(ATTRS[i][0],c)," "+fmt(v)]))))});
   r.append(grid);
