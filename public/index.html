@@ -166,7 +166,8 @@ input[type=text],input[type=tel],select{font:inherit;color:var(--fg);background:
 .res ol{margin:8px 0 0;padding-left:22px}
 .res li{padding:2px 0}
 .pick label .ovrs{font:700 16px var(--display);color:var(--pitch);font-variant-numeric:tabular-nums;min-width:28px;text-align:right}
-.pick label span{min-width:0;overflow-wrap:anywhere;flex:1}
+.pick label > span{flex:none}
+.pick label > span:nth-of-type(2){min-width:0;overflow-wrap:anywhere;flex:1}
 .pick input{accent-color:var(--pitch);width:18px;height:18px;flex:none}
 .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px;background:var(--chalk);border-radius:10px;padding:12px}
 .controls label{font-size:14px;display:flex;gap:6px;align-items:center}
@@ -352,6 +353,8 @@ button.btn.lv-end{width:100%;margin-top:10px;background:var(--vest);border-color
 .import summary{cursor:pointer;font:700 15px var(--display);text-transform:uppercase;letter-spacing:.04em}
 .import .row{margin-top:8px}
 #importMsg{margin-top:8px;white-space:pre-line}
+/* no celular, um time embaixo do outro (sorteio, partida ao vivo e tela de espera) */
+@media (max-width:640px){.teams,.lv-rosters{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
