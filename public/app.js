@@ -591,27 +591,30 @@ function renderGrupo(){
 S.matches=[];S.notes={locked:false};S.savedMine={};let MF=null;
 {const u=ls("usePerf");if(u===false)$("usePerf").checked=false}
 $("usePerf").addEventListener("change",()=>ls("usePerf",$("usePerf").checked));
+const isZag=id=>posOf(S.players.get(id))==="zag";
 function stats(){
-  const st=new Map();const get=id=>{if(!st.has(id))st.set(id,{j:0,v:0,e:0,d:0,g:0,a:0,pts:0});return st.get(id)};
+  const st=new Map();const get=id=>{if(!st.has(id))st.set(id,{j:0,v:0,e:0,d:0,g:0,a:0,cs:0,pts:0});return st.get(id)};
   for(const m of S.matches){
     const sides=[[m.a,m.b],[m.b,m.a]];
     for(const [me,op] of sides)for(const id of me.roster||[]){if(!S.players.has(id))continue;const x=get(id);x.j++;
-      if(me.goals>op.goals){x.v++;x.pts+=3}else if(me.goals===op.goals){x.e++;x.pts++}else x.d++}
+      if(me.goals>op.goals){x.v++;x.pts+=3;if(op.goals===0&&isZag(id))x.cs++}else if(me.goals===op.goals){x.e++;x.pts++}else x.d++}
     for(const [id,n] of Object.entries(m.scorers||{}))if(S.players.has(id))get(id).g+=n;
     for(const [id,n] of Object.entries(m.assists||{}))if(S.players.has(id))get(id).a+=n;
   }
   return st;
 }
 /* Ajuste de força pelo desempenho, comparado com a média do grupo: pontos por jogo pesam 0,3, gols por jogo 0,15
-   e assistências por jogo 0,1. Cresce com o número de jogos (jogos ÷ (jogos+3)) e fica entre −0,5 e +0,5. */
+   e assistências por jogo 0,1. Zagueiros somam também as vitórias sem sofrer gol por jogo (0,1), comparadas só
+   com a média dos zagueiros. Cresce com o número de jogos (jogos ÷ (jogos+3)) e fica entre −0,5 e +0,5. */
 function perfAdj(){
   const st=stats();const xs=[...st.entries()].filter(([,x])=>x.j>0);const out=new Map();if(!xs.length)return out;
   const avg=f=>xs.reduce((q,[,x])=>q+f(x)/x.j,0)/xs.length;const avgP=avg(x=>x.pts),avgG=avg(x=>x.g),avgA=avg(x=>x.a);
-  for(const [id,x] of xs){const raw=((x.pts/x.j-avgP)*0.3+(x.g/x.j-avgG)*0.15+(x.a/x.j-avgA)*0.1)*(x.j/(x.j+3));out.set(id,Math.max(-0.5,Math.min(0.5,raw)))}
+  const zs=xs.filter(([id])=>isZag(id));const avgCS=zs.length?zs.reduce((q,[,x])=>q+x.cs/x.j,0)/zs.length:0;
+  for(const [id,x] of xs){const cs=isZag(id)?(x.cs/x.j-avgCS)*0.1:0;const raw=((x.pts/x.j-avgP)*0.3+(x.g/x.j-avgG)*0.15+(x.a/x.j-avgA)*0.1+cs)*(x.j/(x.j+3));out.set(id,Math.max(-0.5,Math.min(0.5,raw)))}
   return out;
 }
 function perfLine(pid){const x=stats().get(pid);if(!x||!x.j)return null;
-  return el("div",{class:"perfline",text:`${x.j} ${x.j===1?"jogo":"jogos"} · ${x.v}V ${x.e}E ${x.d}D · ${x.g} ${x.g===1?"gol":"gols"} · ${x.a} ${x.a===1?"assist.":"assists."}`})}
+  return el("div",{class:"perfline",text:`${x.j} ${x.j===1?"jogo":"jogos"} · ${x.v}V ${x.e}E ${x.d}D · ${x.g} ${x.g===1?"gol":"gols"} · ${x.a} ${x.a===1?"assist.":"assists."}${isZag(pid)?` · ${x.cs} ${x.cs===1?"vitória":"vitórias"} sem sofrer gol`:""}`})}
 const tName=i=>"Time "+TEAMS[i][0];
 function newMF(){const d=S.saved;if(!d||d.teams.length<2)return null;
   return {a:0,b:1,extraA:[],extraB:[],g:{},as:{},ownA:0,ownB:0,drawAt:d.at}}
@@ -669,8 +672,8 @@ function renderResultados(){
   const pt=$("perfTable");pt.replaceChildren();
   if(!rows.length)pt.append(el("div",{class:"empty",style:"margin-top:10px"},el("strong",{text:"Sem jogos ainda"}),"Vitórias, empates e derrotas de cada um aparecem aqui."));
   else{const adj=perfAdj();rows.sort((a,b)=>b.pts-a.pts||b.v-a.v||b.g-a.g||a.name.localeCompare(b.name,"pt-BR"));
-    pt.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},...[["Jogador",""],["J","Jogos"],["V","Vitórias"],["E","Empates"],["D","Derrotas"],["G","Gols"],["A","Assistências"],["Pts","Pontos"],["Ajuste","Quanto o desempenho soma ou tira da nota geral no sorteio"]].map(([t,ti])=>el("th",{text:t,title:ti})))),
-      el("tbody",{},...rows.map(r=>{const a=adj.get(r.id)||0;return el("tr",{},el("td",{text:r.name}),...[r.j,r.v,r.e,r.d,r.g,r.a,r.pts].map(v=>el("td",{text:String(v)})),el("td",{class:"n",text:(a>=0?"+":"−")+Math.abs(a).toFixed(2).replace(".",",")}))})))))}
+    pt.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},...[["Jogador",""],["J","Jogos"],["V","Vitórias"],["E","Empates"],["D","Derrotas"],["G","Gols"],["A","Assistências"],["SG","Vitórias sem sofrer gol (só zagueiros)"],["Pts","Pontos"],["Ajuste","Quanto o desempenho soma ou tira da nota geral no sorteio"]].map(([t,ti])=>el("th",{text:t,title:ti})))),
+      el("tbody",{},...rows.map(r=>{const a=adj.get(r.id)||0;return el("tr",{},el("td",{text:r.name}),...[r.j,r.v,r.e,r.d,r.g,r.a,isZag(r.id)?r.cs:"–",r.pts].map(v=>el("td",{text:String(v)})),el("td",{class:"n",text:(a>=0?"+":"−")+Math.abs(a).toFixed(2).replace(".",",")}))})))))}
   const ml=$("matchList");ml.replaceChildren();
   if(!S.matches.length){ml.append(el("div",{class:"empty"},el("strong",{text:"Nenhum jogo lançado"}),S.isAdmin?"Lance o primeiro jogo no formulário acima.":"Os jogos aparecem aqui quando os organizadores lançarem."));return}
   let day="";
