@@ -219,6 +219,9 @@ input[type=text],input[type=tel],select{font:inherit;color:var(--fg);background:
 .mteam .score{font:800 40px/1 var(--display);font-variant-numeric:tabular-nums}
 .grow2{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--line)}
 .grow2 > span:first-child{flex:1;min-width:0;overflow-wrap:anywhere}
+.colh-gap{width:94px;flex:none}
+.ghead2{border-top:0;padding-bottom:0}
+.ghead2 .colh{width:94px;text-align:center;font:700 11px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .step{display:flex;align-items:center;gap:4px}
 .step button{width:30px;height:30px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:700 16px var(--body);cursor:pointer;padding:0}
 .step output{min-width:20px;text-align:center;font:700 16px var(--display);font-variant-numeric:tabular-nums}
@@ -423,7 +426,7 @@ button.btn.lv-end{width:100%;margin-top:10px;background:var(--vest);border-color
     <h2>Artilharia</h2>
     <div id="topScorers"></div>
     <h2>Desempenho</h2>
-    <p class="lead">Vitória vale 3 pontos e empate 1. Com a opção ligada no sorteio, quem vem ganhando conta um pouco mais forte e quem vem perdendo um pouco mais fraco.</p>
+    <p class="lead">Vitória vale 3 pontos e empate 1. G = gols, A = assistências. Com a opção ligada no sorteio, quem vem ganhando, fazendo gol e dando assistência conta um pouco mais forte, e quem vem perdendo um pouco mais fraco.</p>
     <div id="perfTable"></div>
     <h2>Jogos</h2>
     <div class="mlist" id="matchList"></div>

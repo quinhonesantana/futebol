@@ -592,33 +592,35 @@ S.matches=[];S.notes={locked:false};S.savedMine={};let MF=null;
 {const u=ls("usePerf");if(u===false)$("usePerf").checked=false}
 $("usePerf").addEventListener("change",()=>ls("usePerf",$("usePerf").checked));
 function stats(){
-  const st=new Map();const get=id=>{if(!st.has(id))st.set(id,{j:0,v:0,e:0,d:0,g:0,pts:0});return st.get(id)};
+  const st=new Map();const get=id=>{if(!st.has(id))st.set(id,{j:0,v:0,e:0,d:0,g:0,a:0,pts:0});return st.get(id)};
   for(const m of S.matches){
     const sides=[[m.a,m.b],[m.b,m.a]];
     for(const [me,op] of sides)for(const id of me.roster||[]){if(!S.players.has(id))continue;const x=get(id);x.j++;
       if(me.goals>op.goals){x.v++;x.pts+=3}else if(me.goals===op.goals){x.e++;x.pts++}else x.d++}
     for(const [id,n] of Object.entries(m.scorers||{}))if(S.players.has(id))get(id).g+=n;
+    for(const [id,n] of Object.entries(m.assists||{}))if(S.players.has(id))get(id).a+=n;
   }
   return st;
 }
-/* Ajuste de força pelo desempenho: até meio ponto para cima ou para baixo, crescendo com o número de jogos. */
+/* Ajuste de força pelo desempenho, comparado com a média do grupo: pontos por jogo pesam 0,3, gols por jogo 0,15
+   e assistências por jogo 0,1. Cresce com o número de jogos (jogos ÷ (jogos+3)) e fica entre −0,5 e +0,5. */
 function perfAdj(){
   const st=stats();const xs=[...st.entries()].filter(([,x])=>x.j>0);const out=new Map();if(!xs.length)return out;
-  const avgP=xs.reduce((q,[,x])=>q+x.pts/x.j,0)/xs.length,avgG=xs.reduce((q,[,x])=>q+x.g/x.j,0)/xs.length;
-  for(const [id,x] of xs){const raw=((x.pts/x.j-avgP)*0.3+(x.g/x.j-avgG)*0.15)*(x.j/(x.j+3));out.set(id,Math.max(-0.5,Math.min(0.5,raw)))}
+  const avg=f=>xs.reduce((q,[,x])=>q+f(x)/x.j,0)/xs.length;const avgP=avg(x=>x.pts),avgG=avg(x=>x.g),avgA=avg(x=>x.a);
+  for(const [id,x] of xs){const raw=((x.pts/x.j-avgP)*0.3+(x.g/x.j-avgG)*0.15+(x.a/x.j-avgA)*0.1)*(x.j/(x.j+3));out.set(id,Math.max(-0.5,Math.min(0.5,raw)))}
   return out;
 }
 function perfLine(pid){const x=stats().get(pid);if(!x||!x.j)return null;
-  return el("div",{class:"perfline",text:`${x.j} ${x.j===1?"jogo":"jogos"} · ${x.v}V ${x.e}E ${x.d}D · ${x.g} ${x.g===1?"gol":"gols"}`})}
+  return el("div",{class:"perfline",text:`${x.j} ${x.j===1?"jogo":"jogos"} · ${x.v}V ${x.e}E ${x.d}D · ${x.g} ${x.g===1?"gol":"gols"} · ${x.a} ${x.a===1?"assist.":"assists."}`})}
 const tName=i=>"Time "+TEAMS[i][0];
 function newMF(){const d=S.saved;if(!d||d.teams.length<2)return null;
-  return {a:0,b:1,extraA:[],extraB:[],g:{},ownA:0,ownB:0,drawAt:d.at}}
+  return {a:0,b:1,extraA:[],extraB:[],g:{},as:{},ownA:0,ownB:0,drawAt:d.at}}
 function rosterOf(side){const d=S.saved;const i=side==="A"?MF.a:MF.b;return [...(d.teams[i]||[]),...((d.subs||[])[i]||[]),...(side==="A"?MF.extraA:MF.extraB)].filter(hasP)}
 function sideGoals(side){return rosterOf(side).reduce((q,id)=>q+(MF.g[id]||0),0)+(side==="A"?MF.ownA:MF.ownB)}
-function stepper(val,onChange,label){
+function stepper(val,onChange,label,what){what=what||"gol";
   const out=el("output",{text:String(val)});
-  return el("span",{class:"step"},el("button",{type:"button","aria-label":"Tirar gol de "+label,text:"−",onclick:()=>onChange(Math.max(0,val-1))}),out,
-    el("button",{type:"button","aria-label":"Somar gol para "+label,text:"+",onclick:()=>onChange(val+1)}))}
+  return el("span",{class:"step"},el("button",{type:"button","aria-label":`Tirar ${what} de ${label}`,text:"−",onclick:()=>onChange(Math.max(0,val-1))}),out,
+    el("button",{type:"button","aria-label":`Somar ${what} para ${label}`,text:"+",onclick:()=>onChange(val+1)}))}
 function renderMatchForm(){
   const box=$("matchForm");box.replaceChildren();if(!S.isAdmin)return;
   box.append(el("h2",{text:"Lançar jogo"}));
@@ -633,9 +635,10 @@ function renderMatchForm(){
   for(const side of ["A","B"]){
     const idx=side==="A"?MF.a:MF.b;const rs=rosterOf(side);
     const panel=el("div",{class:"mteam",style:`--tc:var(${TEAMS[idx][1]})`},el("div",{class:"hd"},el("h3",{text:tName(idx)}),el("span",{class:"score",text:String(sideGoals(side))})));
-    for(const id of rs)panel.append(el("div",{class:"grow2"},el("span",{text:dName(id)}),stepper(MF.g[id]||0,v=>{MF.g[id]=v;renderMatchForm()},getP(id).name)));
+    panel.append(el("div",{class:"grow2 ghead2"},el("span"),el("span",{class:"colh",text:"Gols"}),el("span",{class:"colh",text:"Assist."})));
+    for(const id of rs)panel.append(el("div",{class:"grow2"},el("span",{text:dName(id)}),stepper(MF.g[id]||0,v=>{MF.g[id]=v;renderMatchForm()},getP(id).name),stepper((MF.as||{})[id]||0,v=>{MF.as=MF.as||{};MF.as[id]=v;renderMatchForm()},getP(id).name,"assistência")));
     const own=side==="A"?MF.ownA:MF.ownB;
-    panel.append(el("div",{class:"grow2"},el("span",{class:"note",text:"Gol contra / sem autor"}),stepper(own,v=>{side==="A"?MF.ownA=v:MF.ownB=v;renderMatchForm()},"gol sem autor")));
+    panel.append(el("div",{class:"grow2"},el("span",{class:"note",text:"Gol contra / sem autor"}),stepper(own,v=>{side==="A"?MF.ownA=v:MF.ownB=v;renderMatchForm()},"gol sem autor"),el("span",{class:"colh-gap","aria-hidden":"true"})));
     const used=new Set([...rosterOf("A"),...rosterOf("B")]);
     const opts=[...(S.saved.res||[]),...S.saved.teams.flat()].filter(id=>hasP(id)&&!used.has(id));
     if(opts.length){const add=el("select",{"aria-label":"Adicionar jogador ao "+tName(idx)},el("option",{value:"",text:"+ Entrou alguém de fora do time?"}),...opts.map(id=>el("option",{value:id,text:dName(id)})));
@@ -645,11 +648,12 @@ function renderMatchForm(){
   const save=el("button",{class:"btn primary big",type:"button",style:"margin-top:12px",text:"Salvar jogo",onclick:async()=>{
     err.textContent="";if(MF.a===MF.b){err.textContent="Escolha dois times diferentes.";return}
     const rA=rosterOf("A"),rB=rosterOf("B");const scorers={};for(const id of [...rA,...rB])if(MF.g[id])scorers[id]=MF.g[id];
+    const assists={};for(const id of [...rA,...rB])if((MF.as||{})[id])assists[id]=MF.as[id];
     const names={};for(const id of [...rA,...rB])names[id]=getP(id).name;
     save.disabled=true;
     const firstOfMonth=!S.matches.some(m=>sameMonth(m.at,Date.now()));
     try{if(firstOfMonth&&!S.notes.locked)await S.db.doc("config/notes").set({locked:true,lockedAt:Date.now(),by:myPid()});
-      await S.db.collection("matches").add({at:Date.now(),drawAt:S.saved.at,a:{team:MF.a,roster:rA,goals:sideGoals("A"),own:MF.ownA},b:{team:MF.b,roster:rB,goals:sideGoals("B"),own:MF.ownB},scorers,names});
+      await S.db.collection("matches").add({at:Date.now(),drawAt:S.saved.at,a:{team:MF.a,roster:rA,goals:sideGoals("A"),own:MF.ownA},b:{team:MF.b,roster:rB,goals:sideGoals("B"),own:MF.ownB},scorers,assists,names});
       const keep={a:MF.a,b:MF.b};MF=newMF();MF.a=keep.a;MF.b=keep.b;status("Jogo salvo.");renderMatchForm()}
     catch(e){console.error(e);save.disabled=false;err.textContent=e.code==="permission-denied"?"Só organizadores lançam resultados. Confira se as regras novas do Firestore foram publicadas.":"Não deu para salvar o jogo. Tente de novo."}}});
   f.append(teams,save,err);box.append(f);
@@ -665,8 +669,8 @@ function renderResultados(){
   const pt=$("perfTable");pt.replaceChildren();
   if(!rows.length)pt.append(el("div",{class:"empty",style:"margin-top:10px"},el("strong",{text:"Sem jogos ainda"}),"Vitórias, empates e derrotas de cada um aparecem aqui."));
   else{const adj=perfAdj();rows.sort((a,b)=>b.pts-a.pts||b.v-a.v||b.g-a.g||a.name.localeCompare(b.name,"pt-BR"));
-    pt.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},...["Jogador","J","V","E","D","Gols","Pts","Ajuste"].map(t=>el("th",{text:t,title:t==="Ajuste"?"Quanto o desempenho soma ou tira da nota geral no sorteio":""})))),
-      el("tbody",{},...rows.map(r=>{const a=adj.get(r.id)||0;return el("tr",{},el("td",{text:r.name}),...[r.j,r.v,r.e,r.d,r.g,r.pts].map(v=>el("td",{text:String(v)})),el("td",{class:"n",text:(a>=0?"+":"−")+Math.abs(a).toFixed(2).replace(".",",")}))})))))}
+    pt.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},...[["Jogador",""],["J","Jogos"],["V","Vitórias"],["E","Empates"],["D","Derrotas"],["G","Gols"],["A","Assistências"],["Pts","Pontos"],["Ajuste","Quanto o desempenho soma ou tira da nota geral no sorteio"]].map(([t,ti])=>el("th",{text:t,title:ti})))),
+      el("tbody",{},...rows.map(r=>{const a=adj.get(r.id)||0;return el("tr",{},el("td",{text:r.name}),...[r.j,r.v,r.e,r.d,r.g,r.a,r.pts].map(v=>el("td",{text:String(v)})),el("td",{class:"n",text:(a>=0?"+":"−")+Math.abs(a).toFixed(2).replace(".",",")}))})))))}
   const ml=$("matchList");ml.replaceChildren();
   if(!S.matches.length){ml.append(el("div",{class:"empty"},el("strong",{text:"Nenhum jogo lançado"}),S.isAdmin?"Lance o primeiro jogo no formulário acima.":"Os jogos aparecem aqui quando os organizadores lançarem."));return}
   let day="";
