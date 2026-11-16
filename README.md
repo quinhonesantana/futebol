@@ -86,7 +86,7 @@ Firebase → **Authentication** → **Configurações** → **Domínios autoriza
 
 **Visitantes** (quem abre o link sem entrar) veem, na tela inicial, as abas Jogadores (perfis com as médias) e Resultados. Eles não veem o sorteio, os celulares nem quem deu qual nota. O resumo dos perfis é atualizado sozinho sempre que um organizador está com o app aberto.
 
-O sorteio feito por um organizador fica só na tela dele, como prévia, até ele tocar em **Publicar sorteio**. Para desfazer, use **Cancelar publicação**: o grupo deixa de ver os times e a partida ao vivo volta a aguardar um sorteio. Os jogos já encerrados continuam em Resultados.
+O sorteio feito por um organizador fica só na tela dele, como prévia, até ele tocar em **Publicar sorteio**. Depois do sorteio, na prévia ou já publicado, o organizador pode tocar em **Mover** ao lado de um nome para levar a pessoa a outro time ou aos reservas, ou trocá-la de lugar com alguém de outro time, ou ainda colocar no lugar dela alguém do grupo que não entrou no sorteio ou um convidado (com nome, posição e nota). No sorteio publicado a mudança vale na hora para todos, que veem o aviso "Ajustado à mão depois do sorteio". Para desfazer, use **Cancelar publicação**: o grupo deixa de ver os times e a partida ao vivo volta a aguardar um sorteio. Os jogos já encerrados continuam em Resultados.
 
 ## Partida ao vivo
 A aba **Ao vivo** abre toda **segunda-feira às 19:30**, desde que o sorteio esteja publicado, e fica aberta até 30 minutos depois da 1h30 de pelada. Fora desse horário ela mostra a contagem regressiva e os times sorteados. Um organizador pode abri-la antes, por 3 horas, com **Abrir agora**.

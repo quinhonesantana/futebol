@@ -411,30 +411,91 @@ function renderResult(){
   const teams=d.teams.map(t=>t.filter(id=>hasP(id)));const res=(d.res||[]).filter(id=>hasP(id));const subs=d.subs?teams.map((_,i)=>(d.subs[i]||[]).filter(id=>hasP(id))):null;
   r.append(el("h2",{text:S.draw?"Times sorteados":"Sorteio publicado"}));
   if(S.draw)r.append(el("p",{class:"lead",text:"Prévia: só você está vendo. Toque em Publicar sorteio para mostrar ao grupo, ou sorteie de novo."}));
-  else r.append(el("p",{class:"lead",text:`Publicado pelos organizadores em ${dateBR(d.at)}.`}));
+  else r.append(el("p",{class:"lead",text:`Publicado pelos organizadores em ${dateBR(d.at)}.${d.manual?" Ajustado à mão depois do sorteio.":""}`}));
+  if(S.isAdmin)r.append(el("p",{class:"note",text:S.draw?"Toque em Mover ao lado de um nome para trocar alguém de time antes de publicar.":"Toque em Mover ao lado de um nome para trocar alguém de time. A mudança vale na hora para todo o grupo."}));
   const grid=el("div",{class:"teams"});
   teams.forEach((t,i)=>{const st=teamStats(t);
     grid.append(el("div",{class:"team",style:`--tc:var(${TEAMS[i][1]})`},
       el("h3",{},"Time "+TEAMS[i][0],el("small",{text:`média ${fmt(st.ovr)} · ${t.length} jog.${subs&&subs[i].length?` + ${subs[i].length} res.`:""}`})),
       (()=>{const n=[...t,...(subs?subs[i]:[])].filter(isTop).length;return n?el("div",{class:"topline",text:`${n} ${n===1?"jogador":"jogadores"} nível 4`}):null})(),
-      el("ol",{},...t.map(id=>{const p={id,...getP(id)};const pr=rate(id);return el("li",{},dName(id)," ",posTag(p,true),el("span",{class:"n"+(isTop(id)?" top":""),text:fmt(pr.ovr)}))})),
-      subs&&subs[i].length?el("div",{class:"tsubs"},el("b",{text:"Reservas do time"}),el("ul",{},...subs[i].map(id=>{const p={id,...getP(id)};return el("li",{},dName(id)," ",posTag(p,true),el("span",{class:"n",text:fmt(rate(id).ovr)}))}))):null,
+      el("ol",{},...t.map(id=>{const p={id,...getP(id)};const pr=rate(id);return el("li",{},dName(id)," ",posTag(p,true),el("span",{class:"n"+(isTop(id)?" top":""),text:fmt(pr.ovr)}),moveBtn(id))})),
+      subs&&subs[i].length?el("div",{class:"tsubs"},el("b",{text:"Reservas do time"}),el("ul",{},...subs[i].map(id=>{const p={id,...getP(id)};return el("li",{},dName(id)," ",posTag(p,true),el("span",{class:"n",text:fmt(rate(id).ovr)}),moveBtn(id))}))):null,
       el("div",{class:"tstats"},...st.attrs.flatMap(([c,v],i)=>[i?"  ·  ":"",tip(ATTRS[i][0],c)," "+fmt(v)]))))});
   r.append(grid);
   if(res.length)r.append(el("div",{class:"res"},el("h3",{text:`Reservas (${res.length})`}),el("p",{class:"note",style:"margin:2px 0 0",text:"Entram por ordem de chegada."}),
-    el("ol",{},...res.map(id=>{const p={id,...getP(id)};return el("li",{},dName(id)," ",posTag(p,true))}))));
+    el("ol",{},...res.map(id=>{const p={id,...getP(id)};return el("li",{},dName(id)," ",posTag(p,true),moveBtn(id))}))));
   const acts=el("div",{class:"row",style:"margin-top:12px"});
   const box=el("textarea",{class:"copybox",id:"waBox",readonly:true,hidden:true,"aria-label":"Texto para copiar"});
   acts.append(el("button",{class:"btn primary",type:"button",text:"Copiar para o WhatsApp",onclick:ev=>{const txt=waText(teams,d.at,res,subs);box.value=txt;const b=ev.currentTarget;
     const ok=()=>{b.textContent="Copiado";setTimeout(()=>b.textContent="Copiar para o WhatsApp",1800)};const fb=()=>{box.hidden=false;box.select()};
     try{navigator.clipboard.writeText(txt).then(ok,fb)}catch(e){fb()}}}));
   if(S.draw&&S.isAdmin)acts.append(el("button",{class:"btn",type:"button",text:"Publicar sorteio",onclick:async ev=>{const b=ev.currentTarget;b.disabled=true;
-    try{await S.db.doc("draws/latest").set({teams:Object.fromEntries(teams.map((t,i)=>["t"+i,t])),k:teams.length,res,subs:subs?Object.fromEntries(subs.map((x,i)=>["t"+i,x])):null,guests:Object.fromEntries([...teams.flat(),...res,...(subs||[]).flat()].filter(isGuest).map(id=>{const g=getP(id);return [id,{name:g.name,pos:g.pos,lvl:+g.lvl||3}]})),at:d.at});b.textContent="Publicado para todos";status("Sorteio publicado. Todo o grupo já vê os times na aba Sorteio.")}catch(e){b.disabled=false;status(e.code==="permission-denied"?"Só organizadores podem publicar o sorteio.":"Não foi possível publicar o sorteio.",true)}}}));
+    try{await S.db.doc("draws/latest").set({teams:Object.fromEntries(teams.map((t,i)=>["t"+i,t])),k:teams.length,res,subs:subs?Object.fromEntries(subs.map((x,i)=>["t"+i,x])):null,manual:!!d.manual,guests:Object.fromEntries([...teams.flat(),...res,...(subs||[]).flat()].filter(isGuest).map(id=>{const g=getP(id);return [id,{name:g.name,pos:g.pos,lvl:+g.lvl||3}]})),at:d.at});b.textContent="Publicado para todos";S.draw=null;status("Sorteio publicado. Todo o grupo já vê os times na aba Sorteio. Ainda dá para mover alguém tocando em Mover.")}catch(e){b.disabled=false;status(e.code==="permission-denied"?"Só organizadores podem publicar o sorteio.":"Não foi possível publicar o sorteio.",true)}}}));
   if(S.isAdmin&&S.saved){const running=S.live&&S.live.drawAt===S.saved.at&&S.live.status==="running";
     acts.append(confirmBtn(S.draw?"Cancelar sorteio publicado":"Cancelar publicação",running?"Toque de novo: cancela e para a partida ao vivo sem salvar":"Toque de novo: o grupo deixa de ver os times",cancelPublish,"btn danger"))}
   r.append(acts,box,el("p",{class:"note",style:"margin-top:8px",text:"O número ao lado do nome é a nota geral do perfil."}));
 }
 
+/* ---------- ajuste manual do sorteio (organizador) ---------- */
+/* Depois do sorteio, o organizador pode mover alguém para outro time ou para os reservas, ou trocar duas pessoas de time.
+   Na prévia a mudança fica só na tela; no sorteio publicado ela é gravada e vale na hora para todo o grupo. */
+function moveBtn(id){return S.isAdmin?el("button",{class:"mini mv",type:"button","aria-label":"Mover "+getP(id).name,text:"Mover",onclick:()=>openMove(id)}):null}
+function drawCopy(){const d=S.draw||S.saved;return {teams:d.teams.map(t=>t.filter(hasP)),res:(d.res||[]).filter(hasP),subs:d.subs?d.teams.map((_,i)=>((d.subs[i])||[]).filter(hasP)):null,at:d.at}}
+function locate(c,id){for(let i=0;i<c.teams.length;i++){if(c.teams[i].includes(id))return {kind:"team",i};if(c.subs&&c.subs[i].includes(id))return {kind:"sub",i}}if(c.res.includes(id))return {kind:"res"};return null}
+function removeFrom(c,id){c.teams=c.teams.map(t=>t.filter(x=>x!==id));c.res=c.res.filter(x=>x!==id);if(c.subs)c.subs=c.subs.map(s=>s.filter(x=>x!==id))}
+async function saveDraw(c,msg){
+  c.manual=true;
+  if(S.draw){S.draw=c;renderResult();status(msg+" Ainda é uma prévia: publique para o grupo ver.");return}
+  const all=[...c.teams.flat(),...c.res,...(c.subs||[]).flat()];
+  try{await S.db.doc("draws/latest").set({teams:Object.fromEntries(c.teams.map((t,i)=>["t"+i,t])),k:c.teams.length,res:c.res,subs:c.subs?Object.fromEntries(c.subs.map((x,i)=>["t"+i,x])):null,manual:true,
+      guests:Object.fromEntries(all.filter(isGuest).map(id=>{const g=getP(id);return [id,{name:g.name,pos:g.pos,lvl:+g.lvl||3}]})),at:c.at});
+    status(msg+" O grupo já vê a mudança.")}
+  catch(e){console.error(e);status(e.code==="permission-denied"?"Só organizadores podem ajustar o sorteio.":"Não deu para salvar a mudança. Tente de novo.",true)}
+}
+function openMove(id){
+  const c=drawCopy();const w=locate(c,id);if(!w)return;const name=getP(id).name;
+  const here=w.kind==="team"?`Time ${TEAMS[w.i][0]}`:w.kind==="sub"?`reserva do Time ${TEAMS[w.i][0]}`:"reservas";
+  const dest=[];
+  c.teams.forEach((_,i)=>{if(!(w.kind==="team"&&w.i===i))dest.push({label:`Time ${TEAMS[i][0]}`,c:`var(${TEAMS[i][1]})`,go:x=>x.teams[i].push(id),msg:`${name} foi para o Time ${TEAMS[i][0]}.`})});
+  if(c.subs)c.teams.forEach((_,i)=>{if(!(w.kind==="sub"&&w.i===i))dest.push({label:`Reservas do Time ${TEAMS[i][0]}`,c:`var(${TEAMS[i][1]})`,go:x=>x.subs[i].push(id),msg:`${name} virou reserva do Time ${TEAMS[i][0]}.`})});
+  else if(w.kind!=="res")dest.push({label:"Reservas",c:"var(--line)",go:x=>x.res.push(id),msg:`${name} foi para os reservas.`});
+  const swaps=[];c.teams.forEach((t,i)=>{if(w.kind==="team"&&w.i===i)return;for(const o of t)swaps.push({id:o,i})});
+  const pick=async fn=>{lvClose();const x=drawCopy();await fn(x)};
+  const destBtns=dest.map(d=>el("button",{type:"button",class:"lv-chip",style:`border-left:6px solid ${d.c}`,text:d.label,onclick:()=>pick(async x=>{removeFrom(x,id);d.go(x);await saveDraw(x,d.msg)})}));
+  const swapBtns=swaps.map(sw=>el("button",{type:"button",class:"lv-chip alt",text:`${getP(sw.id).name} (${TEAMS[sw.i][0]})`,onclick:()=>pick(async x=>{
+    /* troca no mesmo lugar: cada um assume a posição do outro na lista */
+    const arr=loc=>loc.kind==="team"?x.teams[loc.i]:loc.kind==="sub"?x.subs[loc.i]:x.res;
+    const a=locate(x,id),b=locate(x,sw.id);if(!a||!b)return;const A=arr(a),B=arr(b),ia=A.indexOf(id),ib=B.indexOf(sw.id);A[ia]=sw.id;B[ib]=id;await saveDraw(x,`${name} e ${getP(sw.id).name} trocaram de lugar.`)})}));
+  lvSheet("var(--vest)",el("h3",{text:`Mover ${name}`}),el("p",{class:"note",style:"margin:4px 0 0",text:`Hoje: ${here}.`}),
+    el("h4",{text:"Mover para"}),el("div",{class:"lv-chips"},...destBtns),
+    swapBtns.length?el("h4",{text:"Ou trocar de lugar com"}):null,swapBtns.length?el("div",{class:"lv-chips"},...swapBtns):null,
+    ...replaceSection(id,w,c),
+    el("div",{class:"lv-actions"},el("button",{class:"btn",type:"button",text:"Cancelar",onclick:lvClose})));
+}
+/* Coloca outra pessoa exatamente na vaga de id: alguém do grupo que não entrou no sorteio ou um convidado novo.
+   Quem sai deixa o sorteio, ou vai para os reservas se o organizador marcar. */
+function replaceSection(id,w,c){
+  const name=getP(id).name;const inDraw=new Set([...c.teams.flat(),...c.res,...(c.subs||[]).flat()]);
+  const out=sortedPlayers().filter(p=>!inDraw.has(p.id));
+  const toRes=el("input",{type:"checkbox",id:"rpToRes"});
+  const resLabel=w.kind==="team"?el("label",{for:"rpToRes",class:"note",style:"display:flex;gap:8px;align-items:center;margin:0 0 8px"},toRes,`${name} vai para os reservas${c.subs?` do Time ${TEAMS[w.i][0]}`:""} (sem marcar, sai do sorteio)`):null;
+  const doReplace=async(newId,label)=>{lvClose();const x=drawCopy();const loc=locate(x,id);if(!loc)return;
+    const arr=loc.kind==="team"?x.teams[loc.i]:loc.kind==="sub"?x.subs[loc.i]:x.res;arr[arr.indexOf(id)]=newId;
+    if(toRes.checked&&loc.kind==="team"){if(x.subs)x.subs[loc.i].push(id);else x.res.push(id)}
+    await saveDraw(x,`${label} entrou no lugar de ${name}${toRes.checked&&loc.kind==="team"?`, que foi para os reservas`:""}.`)};
+  const gName=el("input",{type:"text",id:"rpName",maxlength:"40",placeholder:"Nome do convidado","aria-label":"Nome do convidado"});
+  const gPos=el("select",{id:"rpPos","aria-label":"Posição do convidado"},...POS_KEYS.map(k=>el("option",{value:k,text:POS[k][0]})));gPos.value=posOf(getP(id));
+  const gLvl=el("select",{id:"rpLvl","aria-label":"Nota do convidado"},...[1,2,3,4,5].map(n=>el("option",{value:n,text:"Nota "+n})));gLvl.value="3";
+  const gErr=el("div",{class:"err-text"});
+  const gBtn=el("button",{class:"btn primary",type:"button",text:"Colocar convidado",onclick:()=>{
+    const nm=gName.value.trim().replace(/\s+/g," ");if(!nm){gErr.textContent="Digite o nome do convidado.";return}
+    if([...S.players.values(),...S.guests.values()].some(p=>p.name.toLowerCase()===nm.toLowerCase())){gErr.textContent=`Já existe alguém chamado "${nm}". Use um nome diferente.`;return}
+    const gid="g"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    S.guests.set(gid,{name:nm,pos:gPos.value,lvl:+gLvl.value,guest:true});saveGuests();doReplace(gid,`${nm} (convidado)`)}});
+  return [el("h4",{text:"Ou colocar outra pessoa no lugar"}),resLabel,
+    out.length?el("div",{class:"lv-chips"},...out.map(p=>el("button",{type:"button",class:"lv-chip",text:p.name,onclick:()=>doReplace(p.id,p.name)}))):el("p",{class:"note",style:"margin:0",text:"Todo o grupo já está no sorteio."}),
+    el("div",{class:"rpguest"},el("b",{text:"Convidado"}),gName,el("div",{class:"row"},gPos,gLvl,gBtn),gErr)];
+}
 /* Cancela o sorteio publicado: o grupo deixa de ver os times e a partida ao vivo volta a esperar um sorteio.
    Jogos já encerrados continuam em Resultados. A prévia do organizador, se houver, continua na tela para publicar de novo. */
 async function cancelPublish(){
@@ -887,7 +948,7 @@ function startData(){
   unsubs.push(S.db.doc("config/notes").onSnapshot(d=>{S.notes=d.exists?d.data():{locked:false};if(tab==="avaliar"&&!S.dirty)render();else if(tab==="grupo")renderNotesBox()},fail));
   unsubs.push(S.db.collection("matches").onSnapshot(s=>{S.matches=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.at-a.at);if(tab==="resultados"||tab==="perfis"||tab==="aovivo")render()},fail));
   unsubs.push(onSnapshot(doc(fs,"live","current"),d=>{S.live=d.exists()?d.data():null;if(tab==="aovivo")renderAoVivo()},fail));
-  unsubs.push(S.db.doc("draws/latest").onSnapshot(d=>{if(d.exists){const x=d.data();const teams=[];for(let i=0;i<(x.k||0);i++)teams.push(x.teams["t"+i]||[]);S.savedGuests=x.guests||{};S.saved={teams,res:x.res||[],subs:x.subs?teams.map((_,i)=>x.subs["t"+i]||[]):null,at:x.at}}else S.saved=null;if(tab==="sorteio")renderResult();else if(tab==="aovivo")renderAoVivo()},fail));
+  unsubs.push(S.db.doc("draws/latest").onSnapshot(d=>{if(d.exists){const x=d.data();const teams=[];for(let i=0;i<(x.k||0);i++)teams.push(x.teams["t"+i]||[]);S.savedGuests=x.guests||{};S.saved={teams,res:x.res||[],subs:x.subs?teams.map((_,i)=>x.subs["t"+i]||[]):null,at:x.at,manual:!!x.manual}}else S.saved=null;if(tab==="sorteio")renderResult();else if(tab==="aovivo")renderAoVivo()},fail));
   if(S.isAdmin)unsubs.push(S.db.collection("admins").onSnapshot(s=>{S.adminPhones=new Set(s.docs.map(d=>d.id));if(tab==="grupo")renderGrupo()},fail));
   if(S.isAdmin)unsubs.push(S.db.collection("phoneIndex").onSnapshot(s=>{S.phones=new Map(s.docs.map(d=>[d.data().pid,digitsOf(d.id)]));if(tab==="grupo")renderGrupo()},fail));
 }
