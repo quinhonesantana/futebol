@@ -760,6 +760,17 @@ async function lvEnd(expectedGame,chosenOut){
   if(!ok)return;lvAwake(false);lvToast(summary);
   if(firstOfMonth&&!S.notes.locked)S.db.doc("config/notes").set({locked:true,lockedAt:now,by:myPid()}).catch(e=>console.error(e));
 }
+/* Desfaz o início da partida (começaram sem querer ou com os times errados). Nada vai para Resultados e os gols marcados são apagados.
+   No 1º jogo com 3 times volta para a escolha de quem começa; nos outros casos volta para antes do início, com os mesmos times. */
+async function lvCancelStart(expectedGame){
+  let msg="";
+  const ok=await lvTx(async(tx,L)=>{
+    if(!L||L.drawAt!==S.saved.at||L.status!=="running"||(L.gameNo||0)!==expectedGame)throw new Error("lv:Essa partida já foi encerrada ou cancelada em outro celular.");
+    const first=(L.gameNo||0)===0;
+    if(L.fmt==="3"&&first){tx.set(liveRef(),{...L,status:"setup",a:null,b:null,queue:[],streak:{},startedAt:null,sessionStart:null,events:[]});msg="Início cancelado. Escolham de novo quem começa."}
+    else{tx.set(liveRef(),{...L,status:"ready",startedAt:null,sessionStart:first?null:L.sessionStart,events:[]});msg="Início cancelado. A partida voltou para antes do começo."}});
+  if(ok){S.lvPick=[];lvAwake(false);lvToast(msg)}
+}
 async function lvForceOpen(){const until=Date.now()+3*3600e3;
   const ok=await lvTx(async(tx,cur)=>{const L=cur&&cur.drawAt===S.saved.at?cur:lvState();tx.set(liveRef(),{...L,fresh:null,drawAt:S.saved.at,forceUntil:until})});
   if(ok)lvToast("Partida ao vivo aberta pelas próximas 3 horas.")}
@@ -843,7 +854,8 @@ function renderAoVivo(){
     if(L.status==="running"){const A=lvTeam(L.a),B=lvTeam(L.b);
       ctl.append(el("div",{class:"lv-goalbtns"},el("button",{class:"lv-goalbtn",type:"button",style:`--tc:${A.c}`,onclick:()=>lvOpenGoal(lvState(),L.a)},"+ Gol "+A.name,el("small",{text:"toque e escolha quem fez"})),
         el("button",{class:"lv-goalbtn",type:"button",style:`--tc:${B.c}`,onclick:()=>lvOpenGoal(lvState(),L.b)},"+ Gol "+B.name,el("small",{text:"toque e escolha quem fez"}))),
-        el("button",{class:"btn big lv-end",type:"button",text:fmt==="2"?"Encerrar pelada":"Encerrar partida",onclick:()=>lvOpenEnd(lvState())}))}
+        el("button",{class:"btn big lv-end",type:"button",text:fmt==="2"?"Encerrar pelada":"Encerrar partida",onclick:()=>lvOpenEnd(lvState())}),
+        el("div",{class:"lv-cancel"},confirmBtn("Cancelar início",(L.events||[]).some(e=>e.kind==="goal")?"Toque de novo: volta para antes do começo e apaga os gols marcados":"Toque de novo: volta para antes do começo",()=>lvCancelStart(L.gameNo||0),"mini danger")))}
     else ctl.append(el("button",{class:"btn primary big",type:"button",style:"width:100%",text:fmt==="2"?"Começar a pelada":`Começar ${TEAMS[L.a][0]} x ${TEAMS[L.b][0]}`,onclick:lvStart}));
     ctl.append(el("p",{class:"note",style:"margin:8px 0 0",text:fmt==="2"?"Com 2 times o jogo vai direto até o fim da 1h30. As substituições não precisam ser marcadas.":"Qualquer jogador pode começar e encerrar a partida e marcar gols. O seu nome fica registrado."}));
   }

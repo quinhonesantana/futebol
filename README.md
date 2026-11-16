@@ -94,6 +94,7 @@ A aba **Ao vivo** abre toda **segunda-feira às 19:30**, desde que o sorteio est
 - **3 times:** jogos de 7 minutos. Antes do 1º jogo, escolhe-se quem começa. No 1º jogo o perdedor sai (no empate, escolhe-se quem sai). Depois, sai sempre quem jogou 2 seguidas.
 - **2 times:** um jogo só, direto até o fim da 1h30. Substituições não são marcadas.
 - Qualquer jogador ou organizador começa, marca gols (com assistência e gol contra) e encerra. Cada ação mostra quem fez.
+- Se a partida começar por engano, **Cancelar início** volta para antes do começo (no 1º jogo com 3 times, para a escolha de quem começa) e apaga os gols marcados; nada vai para Resultados.
 - Ao encerrar, o jogo vai sozinho para a aba **Resultados**. Se o primeiro jogo do mês for encerrado, as notas travam.
 - Tudo é compartilhado em tempo real entre os celulares. Dois toques em "Encerrar" ao mesmo tempo não duplicam o jogo.
 
