@@ -692,7 +692,7 @@ function dayText(D){
   s+=D.tied.length>1?`Empate na liderança: ${joinNames(D.tied.map(x=>"Time "+TEAMS[x.i][0]))} (${D.top.pts} ${D.top.pts===1?"pt":"pts"})\n`:`🏆 Campeão: *Time ${TEAMS[D.top.i][0]}* (${D.top.pts} ${D.top.pts===1?"pt":"pts"})\n`;
   s+=`\n*Classificação*\n`+D.table.map((x,k)=>`${k+1}º ${TEAMS[x.i][0]} · ${x.pts} ${x.pts===1?"pt":"pts"} (${x.v}V ${x.e}E ${x.d}D, saldo ${x.gp-x.gc>0?"+":""}${x.gp-x.gc})`).join("\n");
   s+=`\n\n`+D.awards.map(a=>`*${a.t}:* ${a.m} (${a.s})`).join("\n");
-  return s+`\n\nfut-peixe.netlify.app`;
+  return s+`\n\n${location.host}`;
 }
 /* desenha o resumo numa imagem 1080 × 1350 (formato de post), com as cores e o escudo do Peixe */
 let crestImg=null;
@@ -742,7 +742,7 @@ async function dayImage(D){
       g.fillStyle=col(TEAMS[m.a.team][1]);g.beginPath();g.arc(cx+9,cy-10,8,0,7);g.fill();
       g.fillStyle="#fff";g.font=`700 32px ${DISP}`;const t=`${TEAMS[m.a.team][0].toUpperCase()} ${m.a.goals} x ${m.b.goals} ${TEAMS[m.b.team][0].toUpperCase()}`;g.fillText(t,cx+26,cy);
       const w=g.measureText(t).width;g.fillStyle=col(TEAMS[m.b.team][1]);g.beginPath();g.arc(cx+26+w+16,cy-10,8,0,7);g.fill()})}
-  g.fillStyle="#9fb0d0";g.font=`600 24px ${BODY}`;g.textAlign="center";g.fillText("fut-peixe.netlify.app",W/2,H-36);g.textAlign="left";
+  g.fillStyle="#9fb0d0";g.font=`600 24px ${BODY}`;g.textAlign="center";g.fillText(location.host,W/2,H-36);g.textAlign="left";
   return await new Promise((ok,ko)=>c.toBlob(b=>b?ok(b):ko(new Error("toBlob")),"image/png"));
 }
 /* ---------- resultados ---------- */

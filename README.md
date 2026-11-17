@@ -8,7 +8,7 @@ App web para o futebol semanal do grupo:
 - **Jogadores:** as médias de todas as avaliações viram o perfil de cada jogador.
 - **Sorteio:** o app monta times equilibrados por posição (zagueiro, meio, atacante) e por nota, e espalha os jogadores nível 4 (nota geral 4,0 ou mais) entre os times para evitar panela. Você define quantos times e quantos titulares por time, e quem sobra fica de reserva: com 3 ou mais times, numa fila única por ordem de chegada; com 2 times, os reservas são divididos entre os dois, equilibrando posição e nota. Também dá para incluir convidados.
 
-**Tecnologias:** HTML, CSS e JavaScript puros, sem etapa de build. O site é hospedado no Netlify; os dados ficam no Firebase (Firestore e login anônimo pelo celular).
+**Tecnologias:** HTML, CSS e JavaScript puros, sem etapa de build. O site é hospedado na Vercel; os dados ficam no Firebase (Firestore e login anônimo pelo celular).
 
 ## Estrutura
 
@@ -18,11 +18,11 @@ App web para o futebol semanal do grupo:
 | `public/app.js` | Lógica do app: login, avaliação, perfis, sorteio, grupo |
 | `public/firebase-config.js` | Dados do projeto Firebase (preencher) |
 | `firestore.rules` | Regras de segurança do banco |
-| `netlify.toml` | Diz ao Netlify para publicar a pasta `public` |
+| `public/` | Pasta publicada pela Vercel (sem etapa de build) |
 
-## Como publicar (Netlify + Firebase)
+## Como publicar (Vercel + Firebase)
 
-- **Netlify** hospeda o site. Ele é só a pasta `public/`.
+- **Vercel** hospeda o site. Ele é só a pasta `public/`.
 - **Firebase** guarda os dados e faz o login anônimo:
   - **Firestore:** o banco de dados com jogadores, notas e sorteio.
   - **Login anônimo:** liga cada celular ou computador ao jogador que digitou o número. Não envia SMS.
@@ -51,21 +51,21 @@ No Firestore, aba **Dados**, clique em **Iniciar coleção**:
 
 Os outros organizadores você define pelo próprio app: na aba **Grupo**, use **Tornar organizador** ao lado do jogador.
 
-### Parte 2: Netlify (o site)
+### Parte 2: Vercel (o site)
 
 #### 5. Publicar
-O jeito mais simples:
-1. Entre em https://app.netlify.com/drop (crie a conta grátis se pedir).
-2. Arraste a pasta **`public`** (só ela) para a página.
-3. Em segundos aparece o endereço do site, algo como `https://nome-aleatorio.netlify.app`. Em **Site configuration → Change site name** você troca para algo como `sorteio-da-pelada`.
+1. Entre em https://vercel.com (crie a conta grátis com o GitHub).
+2. **Add New → Project** e escolha este repositório.
+3. Em **Root Directory** escolha a pasta `public`, deixe **Framework Preset** como **Other** e clique em **Deploy**.
+4. Em segundos aparece o endereço do site, algo como `https://nome-do-projeto.vercel.app`. Em **Settings → Domains** dá para trocar o nome ou usar um domínio próprio.
 
-Outro jeito: se colocar este projeto num repositório do GitHub e conectar ao Netlify, o arquivo `netlify.toml` já diz para publicar a pasta `public`. Assim, cada alteração enviada ao GitHub publica sozinha.
+Cada alteração enviada ao GitHub publica sozinha.
 
 #### 6. Autorizar o endereço no Firebase
-Firebase → **Authentication** → **Configurações** → **Domínios autorizados** → **Adicionar domínio** → cole o endereço do Netlify sem `https://`. Exemplo: `sorteio-da-pelada.netlify.app`.
+Firebase → **Authentication** → **Configurações** → **Domínios autorizados** → **Adicionar domínio** → cole o endereço da Vercel sem `https://`. Exemplo: `sorteio-da-pelada.vercel.app`.
 
 ### Parte 3: Primeiro acesso
-1. Abra o endereço do Netlify e digite **o celular que você colocou em `admins`**.
+1. Abra o endereço da Vercel e digite **o celular que você colocou em `admins`**.
 2. O app pede seu nome e sua posição. Você entra direto na aba **Grupo**.
 3. Cadastre os jogadores com nome, celular e posição.
 4. Mande o link no grupo do WhatsApp. Cada um entra digitando o próprio celular.
@@ -116,8 +116,7 @@ Na aba **Grupo**, um organizador logado abre **Importar cadastro**, escolhe o ar
 O arquivo tem os celulares do grupo. Não coloque esse arquivo no GitHub.
 
 ## Atualizar o app depois
-- **Publicou arrastando a pasta:** no Netlify, abra o site → **Deploys** → arraste a pasta `public` atualizada.
-- **Usa GitHub:** é só enviar as alterações.
+- É só enviar as alterações ao GitHub: a Vercel publica sozinha.
 
 Os dados ficam no Firebase e não são apagados quando você republica o site.
 
