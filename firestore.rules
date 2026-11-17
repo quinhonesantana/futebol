@@ -75,7 +75,13 @@ service cloud.firestore {
 
     // Partida ao vivo compartilhada: jogadores e organizadores começam, marcam gols e encerram.
     match /live/{id} {
-      allow read, write: if hasClaim();
+      allow read: if signed();
+      allow write: if hasClaim();
+      // Convidados (sem login) só podem marcar ou desfazer um lance por vez, com a partida rolando.
+      allow update: if signed() && resource.data.status == 'running'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['events'])
+        && (request.resource.data.events.size() == resource.data.events.size() + 1
+            || request.resource.data.events.size() == resource.data.events.size() - 1);
     }
 
     // Configurações do grupo (ex.: notas travadas ou em revisão).
@@ -87,7 +93,7 @@ service cloud.firestore {
     }
 
     match /draws/{id} {
-      allow read: if hasClaim();
+      allow read: if signed();
       allow write: if isAdmin();
     }
   }

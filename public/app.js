@@ -82,16 +82,16 @@ function renderShell(){
   $("tabs").hidden=!me;$("v-login").hidden=!!me;$("loginLogo").hidden=!!me;
   if(!me){
     /* visitante: abas Entrar, Perfis e Resultados */
-    const vis=S.visitor;if(!vis||!["entrar","perfis","resultados"].includes(vtab))vtab="entrar";
+    const vis=S.visitor;if(!vis||!["entrar","perfis","aovivo","resultados"].includes(vtab))vtab="entrar";
     $("tabs").hidden=!vis;
-    for(const b of document.querySelectorAll("#tabs button")){const t=b.dataset.tab;b.hidden=!(t==="entrar"||t==="perfis"||t==="resultados");b.disabled=false;b.title="";b.setAttribute("aria-selected",String(t===vtab))}
+    for(const b of document.querySelectorAll("#tabs button")){const t=b.dataset.tab;b.hidden=!(t==="entrar"||t==="perfis"||t==="aovivo"||t==="resultados");b.disabled=false;b.title="";b.setAttribute("aria-selected",String(t===vtab))}
     $("v-login").hidden=vtab!=="entrar";$("loginLogo").hidden=vtab!=="entrar";
     for(const v of VIEWS)$("v-"+v).hidden=!(vis&&v===vtab);
     $("visitorHead").hidden=!(vis&&vtab!=="entrar");$("who").textContent="";return false}
   $("visitorHead").hidden=true;$("tab-entrar").hidden=true;for(const t of ["avaliar","perfis","sorteio","aovivo","resultados"])$("tab-"+t).hidden=false;
   $("tab-grupo").hidden=!S.isAdmin;
-  for(const t of ["perfis","sorteio","aovivo","resultados"]){$("tab-"+t).disabled=g;$("tab-"+t).title=g?"Libera depois que você avaliar todo o grupo":""}
-  if((tab==="perfis"||tab==="sorteio"||tab==="aovivo"||tab==="resultados")&&g)tab="avaliar";
+  for(const t of ["perfis","sorteio","resultados"]){$("tab-"+t).disabled=g;$("tab-"+t).title=g?"Libera depois que você avaliar todo o grupo":""}
+  if((tab==="perfis"||tab==="sorteio"||tab==="resultados")&&g)tab="avaliar";
   if(tab==="grupo"&&!S.isAdmin)tab="avaliar";
   document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===tab));
   for(const v of VIEWS)$("v-"+v).hidden=v!==tab;
@@ -628,13 +628,14 @@ function dayData(key){
   else awards.push({t:"Zagueiro que tomou menos gol",m:"Sem zagueiro",s:"nenhum zagueiro jogou",c:"--line"});
   return {key,ms,table,label,short,top,tied,awards};
 }
-function renderDayResults(){
-  const box=$("dayRes");box.replaceChildren();
+/* resumo da última noite: fica na aba Ao vivo até a próxima partida começar */
+function renderDayResults(box,pick){
+  box.replaceChildren();
   const days=[...new Set(S.matches.map(m=>dayKey(m.at)))].sort().reverse();if(!days.length)return;
-  if(!resDay||!days.includes(resDay))resDay=days[0];
+  if(!pick||!resDay||!days.includes(resDay))resDay=days[0];
   const D=dayData(resDay);const {table,label,top,tied,ms}=D;
-  const sel=days.length>1?el("select",{id:"resDaySel","aria-label":"Escolher o dia"},...days.map(k=>{const m=S.matches.find(x=>dayKey(x.at)===k);return el("option",{value:k,text:new Date(m.at).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})})})):null;
-  if(sel){sel.value=resDay;sel.addEventListener("change",()=>{resDay=sel.value;renderDayResults()})}
+  const sel=pick&&days.length>1?el("select",{id:"resDaySel","aria-label":"Escolher o dia"},...days.map(k=>{const m=S.matches.find(x=>dayKey(x.at)===k);return el("option",{value:k,text:new Date(m.at).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})})})):null;
+  if(sel){sel.value=resDay;sel.addEventListener("change",()=>{resDay=sel.value;renderDayResults(box,pick)})}
   box.append(el("div",{class:"dhead"},el("h2",{text:"Resumo da noite"}),sel||el("span",{class:"note",text:label})));
   if(tied.length>1)box.append(el("div",{class:"champ tie"},el("div",{},el("small",{text:`${label} · ${ms.length} ${ms.length===1?"jogo":"jogos"}`}),el("b",{text:`Empate: ${joinNames(tied.map(x=>TEAMS[x.i][0]))}`})),el("div",{class:"pts",text:String(top.pts)},el("span",{text:"pontos cada"}))));
   else box.append(el("div",{class:"champ",style:`--tc:var(${TEAMS[top.i][1]})`},el("div",{},el("small",{text:`Campeão da noite · ${label}`}),el("b",{text:`Time ${TEAMS[top.i][0]}`})),el("div",{class:"pts",text:String(top.pts)},el("span",{text:"pontos"}))));
@@ -718,11 +719,11 @@ S.matches=[];S.notes={locked:false};S.savedMine={};let MF=null;
 {const u=ls("usePerf");if(u===false)$("usePerf").checked=false}
 $("usePerf").addEventListener("change",()=>ls("usePerf",$("usePerf").checked));
 const isZag=id=>posOf(S.players.get(id))==="zag";
-function stats(){
-  const st=new Map();const get=id=>{if(!st.has(id))st.set(id,{j:0,v:0,e:0,d:0,g:0,a:0,cs:0,pts:0});return st.get(id)};
-  for(const m of S.matches){
+function stats(ms){ms=ms||S.matches;
+  const st=new Map();const get=id=>{if(!st.has(id))st.set(id,{j:0,v:0,e:0,d:0,g:0,a:0,cs:0,pts:0,gp:0,gc:0});return st.get(id)};
+  for(const m of ms){
     const sides=[[m.a,m.b],[m.b,m.a]];
-    for(const [me,op] of sides)for(const id of me.roster||[]){if(!S.players.has(id))continue;const x=get(id);x.j++;
+    for(const [me,op] of sides)for(const id of me.roster||[]){if(!S.players.has(id))continue;const x=get(id);x.j++;x.gp+=me.goals||0;x.gc+=op.goals||0;
       if(me.goals>op.goals){x.v++;x.pts+=3;if(op.goals===0&&isZag(id))x.cs++}else if(me.goals===op.goals){x.e++;x.pts++}else x.d++}
     for(const [id,n] of Object.entries(m.scorers||{}))if(S.players.has(id))get(id).g+=n;
     for(const [id,n] of Object.entries(m.assists||{}))if(S.players.has(id))get(id).a+=n;
@@ -744,7 +745,13 @@ function perfLine(pid){const x=stats().get(pid);if(!x||!x.j)return null;
 const tName=i=>"Time "+TEAMS[i][0];
 function newMF(){const d=S.saved;if(!d||d.teams.length<2)return null;
   return {a:0,b:1,extraA:[],extraB:[],g:{},as:{},ownA:0,ownB:0,drawAt:d.at}}
-function rosterOf(side){const d=S.saved;const i=side==="A"?MF.a:MF.b;return [...(d.teams[i]||[]),...((d.subs||[])[i]||[]),...(side==="A"?MF.extraA:MF.extraB)].filter(hasP)}
+/* corrigir um jogo já lançado: o formulário abre com os times, gols e assistências daquele jogo */
+function editMF(m){const sum=s=>(s.roster||[]).reduce((q,id)=>q+((m.scorers||{})[id]||0),0);
+  return {edit:{id:m.id,at:m.at,rA:[...(m.a.roster||[])],rB:[...(m.b.roster||[])],names:{...(m.names||{})}},a:m.a.team,b:m.b.team,extraA:[],extraB:[],
+    g:{...(m.scorers||{})},as:{...(m.assists||{})},ownA:m.a.own??Math.max(0,m.a.goals-sum(m.a)),ownB:m.b.own??Math.max(0,m.b.goals-sum(m.b))}}
+const mfName=id=>getP(id)?.name||MF?.edit?.names?.[id]||"?";
+const mfLabel=id=>hasP(id)?dName(id):mfName(id);
+function rosterOf(side){if(MF.edit)return [...(side==="A"?MF.edit.rA:MF.edit.rB),...(side==="A"?MF.extraA:MF.extraB)];const d=S.saved;const i=side==="A"?MF.a:MF.b;return [...(d.teams[i]||[]),...((d.subs||[])[i]||[]),...(side==="A"?MF.extraA:MF.extraB)].filter(hasP)}
 function sideGoals(side){return rosterOf(side).reduce((q,id)=>q+(MF.g[id]||0),0)+(side==="A"?MF.ownA:MF.ownB)}
 function stepper(val,onChange,label,what){what=what||"gol";
   const out=el("output",{text:String(val)});
@@ -752,58 +759,92 @@ function stepper(val,onChange,label,what){what=what||"gol";
     el("button",{type:"button","aria-label":`Somar ${what} para ${label}`,text:"+",onclick:()=>onChange(val+1)}))}
 function renderMatchForm(){
   const box=$("matchForm");box.replaceChildren();if(!S.isAdmin)return;
-  box.append(el("h2",{text:"Lançar jogo"}));
-  if(!S.saved){box.append(el("p",{class:"lead",text:"Publique um sorteio na aba Sorteio para lançar os resultados com aqueles times."}));return}
-  if(!MF||MF.drawAt!==S.saved.at)MF=newMF();if(!MF)return;
-  const n=S.saved.teams.length;
-  const sel=(v,on)=>{const s=el("select",{},...Array.from({length:n},(_,i)=>el("option",{value:i,text:tName(i)})));s.value=v;s.addEventListener("change",()=>on(+s.value));return s};
+  const ed=MF?.edit;
+  box.append(el("h2",{text:ed?"Editar jogo":"Lançar jogo"}));
+  if(!ed){
+    if(!S.saved){box.append(el("p",{class:"lead",text:"Publique um sorteio na aba Sorteio para lançar os resultados com aqueles times."}));return}
+    if(!MF||MF.drawAt!==S.saved.at)MF=newMF();if(!MF)return}
+  const n=ed?TEAMS.length:S.saved.teams.length;
+  const sel=(v,on)=>{const s=el("select",{},...Array.from({length:n},(_,i)=>el("option",{value:i,text:tName(i)})));s.value=v;s.disabled=!!ed;s.addEventListener("change",()=>on(+s.value));return s};
   const err=el("div",{class:"err-text"});
   const f=el("div",{class:"mform"},el("div",{class:"vs"},sel(MF.a,v=>{MF.a=v;MF.extraA=[];renderMatchForm()}),el("b",{text:"x"}),sel(MF.b,v=>{MF.b=v;MF.extraB=[];renderMatchForm()}),
-    el("span",{class:"note",text:`Times do sorteio de ${dateBR(S.saved.at)}`})));
+    el("span",{class:"note",text:ed?`Corrigindo o jogo de ${new Date(ed.at).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}`:`Times do sorteio de ${dateBR(S.saved.at)}`})));
   const teams=el("div",{class:"mteams"});
   for(const side of ["A","B"]){
     const idx=side==="A"?MF.a:MF.b;const rs=rosterOf(side);
     const panel=el("div",{class:"mteam",style:`--tc:var(${TEAMS[idx][1]})`},el("div",{class:"hd"},el("h3",{text:tName(idx)}),el("span",{class:"score",text:String(sideGoals(side))})));
     panel.append(el("div",{class:"grow2 ghead2"},el("span"),el("span",{class:"colh",text:"Gols"}),el("span",{class:"colh",text:"Assist."})));
-    for(const id of rs)panel.append(el("div",{class:"grow2"},el("span",{text:dName(id)}),stepper(MF.g[id]||0,v=>{MF.g[id]=v;renderMatchForm()},getP(id).name),stepper((MF.as||{})[id]||0,v=>{MF.as=MF.as||{};MF.as[id]=v;renderMatchForm()},getP(id).name,"assistência")));
+    for(const id of rs)panel.append(el("div",{class:"grow2"},el("span",{text:mfLabel(id)}),stepper(MF.g[id]||0,v=>{MF.g[id]=v;renderMatchForm()},mfName(id)),stepper((MF.as||{})[id]||0,v=>{MF.as=MF.as||{};MF.as[id]=v;renderMatchForm()},mfName(id),"assistência")));
     const own=side==="A"?MF.ownA:MF.ownB;
     panel.append(el("div",{class:"grow2"},el("span",{class:"note",text:"Gol contra / sem autor"}),stepper(own,v=>{side==="A"?MF.ownA=v:MF.ownB=v;renderMatchForm()},"gol sem autor"),el("span",{class:"colh-gap","aria-hidden":"true"})));
     const used=new Set([...rosterOf("A"),...rosterOf("B")]);
-    const opts=[...(S.saved.res||[]),...S.saved.teams.flat()].filter(id=>hasP(id)&&!used.has(id));
-    if(opts.length){const add=el("select",{"aria-label":"Adicionar jogador ao "+tName(idx)},el("option",{value:"",text:"+ Entrou alguém de fora do time?"}),...opts.map(id=>el("option",{value:id,text:dName(id)})));
+    const opts=(ed?[...S.players.keys()].sort((x,y)=>mfName(x).localeCompare(mfName(y),"pt-BR")):[...(S.saved.res||[]),...S.saved.teams.flat()]).filter(id=>hasP(id)&&!used.has(id));
+    if(opts.length){const add=el("select",{"aria-label":"Adicionar jogador ao "+tName(idx)},el("option",{value:"",text:ed?"+ Faltou alguém neste time?":"+ Entrou alguém de fora do time?"}),...opts.map(id=>el("option",{value:id,text:dName(id)})));
       add.addEventListener("change",()=>{if(!add.value)return;(side==="A"?MF.extraA:MF.extraB).push(add.value);renderMatchForm()});panel.append(add)}
     teams.append(panel);
   }
-  const save=el("button",{class:"btn primary big",type:"button",style:"margin-top:12px",text:"Salvar jogo",onclick:async()=>{
+  const save=el("button",{class:"btn primary big",type:"button",style:"margin-top:12px"+(ed?";width:100%":""),text:ed?"Salvar correção":"Salvar jogo",onclick:async()=>{
     err.textContent="";if(MF.a===MF.b){err.textContent="Escolha dois times diferentes.";return}
     const rA=rosterOf("A"),rB=rosterOf("B");const scorers={};for(const id of [...rA,...rB])if(MF.g[id])scorers[id]=MF.g[id];
     const assists={};for(const id of [...rA,...rB])if((MF.as||{})[id])assists[id]=MF.as[id];
-    const names={};for(const id of [...rA,...rB])names[id]=getP(id).name;
+    const names={};for(const id of [...rA,...rB])names[id]=mfName(id);
     save.disabled=true;
+    if(ed){try{await S.db.collection("matches").doc(ed.id).update({a:{team:MF.a,roster:rA,goals:sideGoals("A"),own:MF.ownA},b:{team:MF.b,roster:rB,goals:sideGoals("B"),own:MF.ownB},scorers,assists,names,events:null,editedAt:Date.now(),editedBy:myPid()});
+        MF=null;status("Jogo corrigido.");renderResultados()}
+      catch(e){console.error(e);save.disabled=false;err.textContent=e.code==="permission-denied"?"Só organizadores corrigem jogos.":"Não deu para salvar a correção. Tente de novo."}
+      return}
     const firstOfMonth=!S.matches.some(m=>sameMonth(m.at,Date.now()));
     try{if(firstOfMonth&&!S.notes.locked)await S.db.doc("config/notes").set({locked:true,lockedAt:Date.now(),by:myPid()});
       await S.db.collection("matches").add({at:Date.now(),drawAt:S.saved.at,a:{team:MF.a,roster:rA,goals:sideGoals("A"),own:MF.ownA},b:{team:MF.b,roster:rB,goals:sideGoals("B"),own:MF.ownB},scorers,assists,names});
       const keep={a:MF.a,b:MF.b};MF=newMF();MF.a=keep.a;MF.b=keep.b;status("Jogo salvo.");renderMatchForm()}
     catch(e){console.error(e);save.disabled=false;err.textContent=e.code==="permission-denied"?"Só organizadores lançam resultados. Confira se as regras novas do Firestore foram publicadas.":"Não deu para salvar o jogo. Tente de novo."}}});
-  f.append(teams,save,err);box.append(f);
+  f.append(teams,save);
+  if(ed)f.append(el("button",{class:"btn",type:"button",style:"margin-top:8px;width:100%",text:"Cancelar edição",onclick:()=>{MF=null;renderResultados()}}));
+  f.append(err);box.append(f);
+}
+/* Resultados mostra o acumulado do mês (artilharia, desempenho e jogos); dá para ver outros meses ou tudo */
+let resMonth=null;
+const monthKey=t=>{const d=new Date(t);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")};
+const resMonthName=k=>{if(k==="all")return "todo o período";const [y,m]=k.split("-").map(Number);return new Date(y,m-1,1).toLocaleDateString("pt-BR",{month:"long"})+(y!==new Date().getFullYear()?" de "+y:"")};
+const cap=x=>x.charAt(0).toUpperCase()+x.slice(1);
+function renderMonthHead(ms,months){
+  const box=$("monthRes");box.replaceChildren();
+  const sel=el("select",{"aria-label":"Escolher o mês"},...months.map(k=>el("option",{value:k,text:cap(resMonthName(k))})),el("option",{value:"all",text:"Todo o período"}));
+  sel.value=resMonth;sel.addEventListener("change",()=>{resMonth=sel.value;renderResultados()});
+  const nights=new Set(ms.map(m=>dayKey(m.at))).size,goals=ms.reduce((q,m)=>q+(m.a.goals||0)+(m.b.goals||0),0);
+  box.append(el("div",{class:"dhead"},el("h2",{text:resMonth==="all"?"Acumulado geral":"Acumulado de "+resMonthName(resMonth)}),sel),
+    el("div",{class:"mstats"},...[[nights,nights===1?"noite":"noites"],[ms.length,ms.length===1?"jogo":"jogos"],[goals,goals===1?"gol":"gols"]].map(([v,t])=>el("div",{},el("b",{text:String(v)}),el("span",{text:t})))));
 }
 function renderResultados(){
-  renderMatchForm();renderDayResults();
-  const st=stats();const rows=[...st.entries()].filter(([,x])=>x.j>0).map(([id,x])=>({id,...x,name:S.players.get(id).name}));
+  renderMatchForm();
+  const now=monthKey(Date.now());const months=[...new Set([now,...S.matches.map(m=>monthKey(m.at))])].sort().reverse();
+  if(!resMonth||(resMonth!=="all"&&!months.includes(resMonth)))resMonth=now;
+  const ms=resMonth==="all"?S.matches:S.matches.filter(m=>monthKey(m.at)===resMonth);
+  renderMonthHead(ms,months);
+  const st=stats(ms);const rows=[...st.entries()].filter(([,x])=>x.j>0).map(([id,x])=>({id,...x,name:S.players.get(id).name}));
+  /* classificação: cada jogador soma o resultado do time em que jogou (vitória 3, empate 1).
+     Desempate como nos campeonatos: pontos, vitórias, saldo de gols, gols pró. Empatados em tudo dividem a posição. */
+  const rk=$("rankTable");rk.replaceChildren();
+  if(!rows.length)rk.append(el("div",{class:"empty",style:"margin-top:10px"},el("strong",{text:"Sem jogos no período"}),"A classificação aparece quando os jogos forem lançados."));
+  else{const cmp=(a,b)=>b.pts-a.pts||b.v-a.v||(b.gp-b.gc)-(a.gp-a.gc)||b.gp-a.gp;
+    const rr=[...rows].sort((a,b)=>cmp(a,b)||a.name.localeCompare(b.name,"pt-BR"));let pos=0;
+    rk.append(el("div",{class:"tbl ltbl rank"},el("table",{},el("thead",{},el("tr",{},...[["#","Posição"],["Jogador",""],["P","Pontos"],["J","Jogos"],["V","Vitórias"],["E","Empates"],["D","Derrotas"],["GP","Gols pró do time"],["GC","Gols contra o time"],["SG","Saldo de gols"],["%","Aproveitamento"]].map(([t,ti])=>el("th",{text:t,title:ti})))),
+      el("tbody",{},...rr.map((r,k)=>{if(k===0||cmp(rr[k-1],r))pos=k+1;const sg=r.gp-r.gc;
+        return el("tr",{class:pos===1?"first":""},el("td",{class:"n",text:pos+"º"}),el("td",{text:r.name}),...[r.pts,r.j,r.v,r.e,r.d,r.gp,r.gc,(sg>0?"+":"")+sg,Math.round(r.pts/(r.j*3)*100)+"%"].map(v=>el("td",{text:String(v)})))})))))}
   const top=$("topScorers");top.replaceChildren();
   const sc=rows.filter(r=>r.g>0).sort((a,b)=>b.g-a.g||a.j-b.j||a.name.localeCompare(b.name,"pt-BR")).slice(0,10);
-  if(!sc.length)top.append(el("div",{class:"empty",style:"margin-top:10px"},el("strong",{text:"Nenhum gol lançado"}),"Os artilheiros aparecem aqui quando os organizadores lançarem os jogos."));
+  if(!sc.length)top.append(el("div",{class:"empty",style:"margin-top:10px"},el("strong",{text:"Nenhum gol lançado"}),resMonth==="all"?"Os artilheiros aparecem aqui quando os jogos forem lançados.":`Os artilheiros de ${resMonthName(resMonth)} aparecem aqui quando os jogos forem lançados.`));
   else top.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},...["Jogador","Gols","Jogos","Média"].map(t=>el("th",{text:t})))),
     el("tbody",{},...sc.map((r,i)=>el("tr",{},el("td",{},el("span",{class:"n",text:i+1+"º "}),r.name),el("td",{text:String(r.g)}),el("td",{text:String(r.j)}),el("td",{text:fmt(r.g/r.j)})))))));
   const pt=$("perfTable");pt.replaceChildren();
   if(!rows.length)pt.append(el("div",{class:"empty",style:"margin-top:10px"},el("strong",{text:"Sem jogos ainda"}),"Vitórias, empates e derrotas de cada um aparecem aqui."));
   else{const adj=perfAdj();rows.sort((a,b)=>b.pts-a.pts||b.v-a.v||b.g-a.g||a.name.localeCompare(b.name,"pt-BR"));
-    pt.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},...[["Jogador",""],["J","Jogos"],["V","Vitórias"],["E","Empates"],["D","Derrotas"],["G","Gols"],["A","Assistências"],["SG","Vitórias sem sofrer gol (só zagueiros)"],["Pts","Pontos"],["Ajuste","Quanto o desempenho soma ou tira da nota geral no sorteio"]].map(([t,ti])=>el("th",{text:t,title:ti})))),
+    pt.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},...[["Jogador",""],["J","Jogos"],["V","Vitórias"],["E","Empates"],["D","Derrotas"],["G","Gols"],["A","Assistências"],["VSG","Vitórias sem sofrer gol (só zagueiros)"],["Pts","Pontos"],["Ajuste","Quanto o desempenho soma ou tira da nota geral no sorteio"]].map(([t,ti])=>el("th",{text:t,title:ti})))),
       el("tbody",{},...rows.map(r=>{const a=adj.get(r.id)||0;return el("tr",{},el("td",{text:r.name}),...[r.j,r.v,r.e,r.d,r.g,r.a,isZag(r.id)?r.cs:"–",r.pts].map(v=>el("td",{text:String(v)})),el("td",{class:"n",text:(a>=0?"+":"−")+Math.abs(a).toFixed(2).replace(".",",")}))})))))}
   const ml=$("matchList");ml.replaceChildren();
-  if(!S.matches.length){ml.append(el("div",{class:"empty"},el("strong",{text:"Nenhum jogo lançado"}),S.isAdmin?"Lance o primeiro jogo no formulário acima.":"Os jogos aparecem aqui quando os organizadores lançarem."));return}
+  if(!ms.length){ml.append(el("div",{class:"empty"},el("strong",{text:resMonth==="all"?"Nenhum jogo lançado":"Nenhum jogo em "+resMonthName(resMonth)}),S.isAdmin?"Lance o primeiro jogo no formulário acima.":"Os jogos aparecem aqui quando os organizadores lançarem."));return}
   let day="";
-  for(const m of S.matches){
+  for(const m of ms){
     const dk=dateBR(m.at);if(dk!==day){day=dk;ml.append(el("div",{class:"mday",text:new Date(m.at).toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit"})}))}
     const nm=id=>m.names?.[id]||getP(id)?.name||"?";
     const goalsTxt=side=>{const s=m[side];const parts=(s.roster||[]).filter(id=>m.scorers?.[id]).map(id=>nm(id)+(m.scorers[id]>1?` (${m.scorers[id]})`:""));if(s.own)parts.push(`${s.own} sem autor`);return parts.join(", ")};
@@ -812,7 +853,9 @@ function renderResultados(){
     const ga=goalsTxt("a"),gb=goalsTxt("b");
     if(ga)card.append(el("div",{class:"who",text:`${TEAMS[m.a.team][0]}: ${ga}`}));
     if(gb)card.append(el("div",{class:"who",text:`${TEAMS[m.b.team][0]}: ${gb}`}));
-    if(S.isAdmin)card.append(el("div",{class:"acts"},confirmBtn("Apagar jogo","Toque de novo para apagar",async()=>{await S.db.collection("matches").doc(m.id).delete()})));
+    if(MF?.edit?.id===m.id)card.classList.add("editing");
+    if(S.isAdmin)card.append(el("div",{class:"acts"},el("button",{class:"mini",type:"button",text:"Editar jogo",onclick:()=>{MF=editMF(m);renderResultados();$("matchForm").scrollIntoView({behavior:"smooth",block:"start"})}}),
+      confirmBtn("Apagar jogo","Toque de novo para apagar",async()=>{if(MF?.edit?.id===m.id)MF=null;await S.db.collection("matches").doc(m.id).delete()})));
     ml.append(card);
   }
 }
@@ -843,6 +886,7 @@ function lvRemaining(L){return Math.max(0,(L.dur||LV.MATCH3)-lvElapsed(L))}
 const lvMin=L=>Math.min(Math.ceil((L.dur||0)/60),Math.floor(lvElapsed(L)/60)+1);
 const lvClock=s=>{s=Math.ceil(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=String(s%60).padStart(2,"0");return h?`${h}:${String(m).padStart(2,"0")}:${x}`:`${String(m).padStart(2,"0")}:${x}`};
 function lvGoals(L,side){return (L.events||[]).filter(e=>e.kind==="goal"&&e.team===L[side]).length}
+const lvMe=()=>myPid()||("v:"+(auth?.currentUser?.uid||"anon"));
 function lvMyName(){return S.players.get(myPid())?.name||"Alguém"}
 function lvToast(msg,action){const old=document.querySelector(".lv-toast");if(old)old.remove();const t=el("div",{class:"lv-toast",role:"status"},el("span",{text:msg}),action?el("button",{type:"button",class:"lv-toastbtn",text:action.label,onclick:()=>{t.remove();action.fn()}}):null);document.body.append(t);setTimeout(()=>t.remove(),action?6000:3400)}
 async function lvAwake(on){try{if(on&&!lvWake&&navigator.wakeLock)lvWake=await navigator.wakeLock.request("screen");if(!on&&lvWake){await lvWake.release();lvWake=null}}catch(e){lvWake=null}}
@@ -867,9 +911,13 @@ async function lvStart(){
     tx.set(liveRef(),{...L,fresh:null,drawAt:S.saved.at,status:"running",startedAt:now,sessionStart:L.sessionStart||now,dur:L.fmt==="2"?LV.SESSION:LV.MATCH3,events:[{id:"s"+now,kind:"start",by:myPid(),at:now}]})});
   if(ok)lvAwake(true);
 }
-async function lvGoal(ev){try{await updateDoc(liveRef(),{events:arrayUnion(ev)});lvToast(`Gol do ${TEAMS[ev.team][0]}${ev.scorer&&ev.scorer!=="?"?`: ${ev.own?"contra de ":""}${getP(ev.scorer)?.name||""}`:""} aos ${ev.min}'.`,{label:"Desfazer",fn:()=>lvUndo(ev)})}
+async function lvGoal(ev){try{await updateDoc(liveRef(),{events:arrayUnion(ev)});lvToast(`Gol do ${TEAMS[ev.team][0]}${ev.scorer&&ev.scorer!=="?"?`: ${ev.own?"contra de ":""}${getP(ev.scorer)?.name||""}`:""} aos ${ev.min}'.`)}
   catch(e){console.error(e);status("Não deu para marcar o gol. Confira a internet e tente de novo.",true)}}
-async function lvUndo(ev){try{await updateDoc(liveRef(),{events:arrayRemove(ev)});lvToast("Gol desfeito.")}catch(e){console.error(e);status("Não deu para desfazer o gol.",true)}}
+async function lvUndo(ev){try{await updateDoc(liveRef(),{events:arrayRemove(ev)});lvToast("Gol cancelado.")}catch(e){console.error(e);status("Não deu para cancelar o gol.",true)}}
+/* × no canto do lance: 1º toque pergunta, 2º toque cancela o gol */
+function lvXBtn(ev){const b=el("button",{class:"lv-gx",type:"button","aria-label":"Cancelar este gol",title:"Cancelar este gol",text:"×"});
+  b.addEventListener("click",()=>{if(b.dataset.c!=="1"){b.dataset.c="1";b.classList.add("ask");b.textContent="Cancelar gol?";setTimeout(()=>{b.dataset.c="";b.classList.remove("ask");b.textContent="×"},4000);return}
+    b.disabled=true;lvUndo(ev)});return b}
 async function lvEnd(expectedGame,chosenOut){
   const now=Date.now();let summary="";
   const firstOfMonth=!S.matches.some(m=>{const x=new Date(m.at),y=new Date(now);return x.getFullYear()===y.getFullYear()&&x.getMonth()===y.getMonth()});
@@ -922,11 +970,11 @@ function lvSheet(tc,...kids){document.body.classList.add("lv-lock");document.que
 function lvClose(){$("lvLayer").replaceChildren();document.body.classList.remove("lv-lock")}
 document.addEventListener("keydown",e=>{if(e.key==="Escape")lvClose()});
 /* Lançar gol no celular em 2 toques: 1) quem fez (grade de botões grandes); 2) quem deu a assistência ou "Sem assistência".
-   O gol é salvo no 2º toque. "Não sei quem fez" e gol contra salvam no 1º toque. Depois aparece o aviso com Desfazer. */
+   O gol é salvo no 2º toque. "Não sei quem fez" e gol contra salvam no 1º toque. Para cancelar, o × no canto do lance. */
 function lvOpenGoal(L,t){
   const T=lvTeam(t),opp=t===L.a?L.b:L.a,O=lvTeam(opp);const min=lvMin(L);const gameNo=L.gameNo||0;
   const save=(scorer,own,assist)=>{const cur=lvState();if(cur.status!=="running"||(cur.gameNo||0)!==gameNo){lvClose();status("Essa partida já foi encerrada.",true);return}
-    lvClose();lvGoal({id:"g"+Date.now()+Math.random().toString(36).slice(2,6),kind:"goal",team:t,scorer,own,assist:assist||null,min,by:myPid(),at:Date.now()})};
+    lvClose();lvGoal({id:"g"+Date.now()+Math.random().toString(36).slice(2,6),kind:"goal",team:t,scorer,own,assist:assist||null,min,by:lvMe(),at:Date.now()})};
   const pbtn=(id,onclick,cls)=>{const p=getP(id);return el("button",{type:"button",class:"lv-pbtn"+(cls?" "+cls:""),onclick},el("span",{class:"nm",text:p.name}),el("span",{class:"ps",text:POS[posOf(p)]?.[1]||""}))};
   const order=ids=>[...ids].sort((a,b)=>POS_KEYS.indexOf(posOf(getP(b)))-POS_KEYS.indexOf(posOf(getP(a)))||getP(a).name.localeCompare(getP(b).name,"pt-BR"));
   const body=el("div",{class:"lv-gbody"}),head=el("div",{class:"lv-ghead"}),foot=el("div",{class:"lv-gfoot"});
@@ -967,6 +1015,7 @@ function lvOpenEnd(L){
 function lvRoster(t,L,goalsById){const T=lvTeam(t);
   return el("div",{class:"lv-roster",style:`--tc:${T.c}`},el("h3",{text:T.name}),el("ul",{},...T.ids.map(id=>{const g=goalsById[id]||0;const p={id,...getP(id)};
     return el("li",{},posTag(p,true),el("span",{class:"n",text:dName(id)}),lvIsSub(t,id)?el("span",{class:"lv-sub",text:"reserva"}):null,g?el("span",{class:"lv-balls",text:g+(g>1?" gols":" gol")}):null)})))}
+function lvLastNight(box){const dr=el("section",{class:"dayres lv-night"});renderDayResults(dr,false);if(dr.childNodes.length)box.append(dr)}
 function lvWaiting(box){
   const w=lvWindow(Date.now());const when=new Date(w.next);
   const cd=el("div",{class:"lv-cd",id:"lvCountdown"});
@@ -976,6 +1025,7 @@ function lvWaiting(box){
     el("p",{class:"note",text:S.saved?"A partida ao vivo abre sozinha na segunda às 19:30, com os times publicados.":"A partida ao vivo abre na segunda às 19:30, depois que os organizadores publicarem os times."}),
     S.saved&&S.isAdmin?el("button",{class:"btn",type:"button",text:"Abrir agora (fora do horário)",onclick:lvForceOpen}):null,
     !S.saved&&S.isAdmin?el("p",{class:"note"},el("b",{text:"Organizador: "}),"publique o sorteio na aba Sorteio para liberar esta tela."):null));
+  lvLastNight(box);
   if(S.saved){const pv=el("div",{class:"lv-rosters",style:"margin-top:14px"});S.saved.teams.forEach((_,i)=>pv.append(lvRoster(i,null,{})));box.append(pv)}
   lvTick();
 }
@@ -984,9 +1034,9 @@ function renderAoVivo(){
   if(!lvOpen()){lvWaiting(box);return}
   const L=lvState();const fmt=L.fmt;
   if(L.status==="done"){const ms=S.matches.filter(m=>m.drawAt===S.saved.at).sort((a,b)=>a.at-b.at);box.append(el("div",{class:"lv-gate"},el("img",{src:"logo.jpg",alt:"",class:"lv-crest"}),el("span",{class:"lv-state",text:"Pelada encerrada"}),el("h2",{text:"Valeu, Peixe!"}),
-    el("p",{class:"note",text:ms.length?`${ms.length===1?"Foi 1 jogo":`Foram ${ms.length} jogos`} hoje. Os resultados já estão na aba Resultados.`:"Nenhum jogo foi encerrado hoje."}),...ms.map(m=>el("div",{class:"lv-gameline"},TEAMS[m.a.team][0],el("b",{text:` ${m.a.goals} x ${m.b.goals} `}),TEAMS[m.b.team][0])),
+    el("p",{class:"note",text:ms.length?`${ms.length===1?"Foi 1 jogo":`Foram ${ms.length} jogos`} hoje. O resumo da noite está logo abaixo.`:"Nenhum jogo foi encerrado hoje."}),...ms.map(m=>el("div",{class:"lv-gameline"},TEAMS[m.a.team][0],el("b",{text:` ${m.a.goals} x ${m.b.goals} `}),TEAMS[m.b.team][0])),
     el("p",{class:"note",text:`A próxima abre ${new Date(lvWindow(Date.now()+12*3600e3).next).toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit"})} às 19:30.`}),
-    S.isAdmin?confirmBtn("Reabrir o ao vivo","Toque de novo: reabre por 3 horas",lvReopen,"btn"):null));return}
+    S.isAdmin?confirmBtn("Reabrir o ao vivo","Toque de novo: reabre por 3 horas",lvReopen,"btn"):null));lvLastNight(box);return}
   /* placar */
   const board=el("section",{class:"lv-board","aria-label":"Placar"});
   const st=L.status==="setup"?["paused","Não começou"]:L.status==="ready"?["paused","Não começou"]:lvRemaining(L)<=0?["over","Fim do tempo"]:["","Ao vivo"];
@@ -1000,9 +1050,15 @@ function renderAoVivo(){
       el("div",{class:"lv-tbar"},el("i",{id:"lvTbar"})))}
   if(fmt==="3")board.append(el("div",{class:"lv-sess"},"Pelada 1h30",el("span",{class:"lv-sbar"},el("i",{id:"lvSbar"})),el("span",{},"faltam ",el("b",{id:"lvSess"}))));
   box.append(board);
-  /* controles: qualquer jogador ou organizador */
+  /* controles: qualquer jogador ou organizador; convidados (sem login) só marcam gols e assistências */
   const ctl=el("section",{class:"lv-panel"});
-  if(L.status==="setup"){const pick=S.lvPick||[];const n=S.saved.teams.length;
+  if(!myPid()){
+    if(L.status==="running"){const A=lvTeam(L.a),B=lvTeam(L.b);
+      ctl.append(el("div",{class:"lv-goalbtns"},el("button",{class:"lv-goalbtn",type:"button",style:`--tc:${A.c}`,onclick:()=>lvOpenGoal(lvState(),L.a)},"+ Gol "+A.name,el("small",{text:"toque para marcar"})),
+        el("button",{class:"lv-goalbtn",type:"button",style:`--tc:${B.c}`,onclick:()=>lvOpenGoal(lvState(),L.b)},"+ Gol "+B.name,el("small",{text:"toque para marcar"}))),
+        el("p",{class:"note",style:"margin:8px 0 0",text:"Você está como convidado: dá para marcar gols e assistências. Começar e encerrar a partida fica com quem entrou com o celular."}))}
+    else ctl.append(el("p",{class:"note",style:"margin:0",text:L.status==="setup"?"A partida ainda não começou. Quem entrou com o celular escolhe os times e dá o início.":"A próxima partida ainda não começou. Assim que começar, os botões de gol aparecem aqui."}));
+  }else if(L.status==="setup"){const pick=S.lvPick||[];const n=S.saved.teams.length;
     ctl.append(el("h2",{text:"Escolha quem começa"}));
     const grid=el("div",{class:"lv-pick"});
     for(let i=0;i<n;i++){const T=lvTeam(i);const on=pick.includes(i);grid.append(el("button",{type:"button",class:"lv-pickbtn",style:`--tc:${T.c}`,"aria-pressed":String(on),onclick:()=>{S.lvPick=on?pick.filter(x=>x!==i):[...pick,i].slice(-2);renderAoVivo()}},el("i"),T.name,el("small",{text:on?"Começa jogando":"Toque para escolher"})))}
@@ -1022,10 +1078,10 @@ function renderAoVivo(){
   /* lances */
   const tl=el("ul",{class:"lv-tl"});const evs=[...(L.events||[])].reverse();
   for(const e of evs){
-    if(e.kind==="goal"){const T=lvTeam(e.team);const p=getP(e.scorer);const as=e.assist?getP(e.assist):null;const who=e.by===myPid()?"você":(S.players.get(e.by)?.name||"alguém");
+    if(e.kind==="goal"){const T=lvTeam(e.team);const p=getP(e.scorer);const as=e.assist?getP(e.assist):null;const who=e.by===lvMe()?"você":String(e.by||"").startsWith("v:")?"convidado":(S.players.get(e.by)?.name||"alguém");
       tl.append(el("li",{style:`--tc:${T.c}`},el("span",{class:"min",text:e.min+"'"}),el("span",{class:"dot"}),
         el("span",{class:"what"},el("b",{text:e.own?`Gol contra de ${p?.name||"?"}`:e.scorer==="?"?"Gol (autor não informado)":`Gol de ${p?.name||"?"}`}),el("small",{text:`${T.name}${as?` · assistência de ${as.name}`:""} · marcado por ${who}`})),
-        (S.isAdmin||e.by===myPid())&&L.status==="running"?el("button",{class:"mini",type:"button",text:"Desfazer",onclick:()=>lvUndo(e)}):el("span")))}
+        (S.isAdmin||e.by===lvMe())&&L.status==="running"?lvXBtn(e):el("span")))}
     else{const who=e.by===myPid()?"você começou":`começada por ${S.players.get(e.by)?.name||"alguém"}`;tl.append(el("li",{class:"sys"},el("span",{class:"min",text:"1'"}),el("span",{class:"dot"}),el("span",{class:"what",text:`Bola rolando · ${who}`}),el("span")))}
   }
   if(!evs.length)tl.append(el("li",{class:"sys"},el("span"),el("span"),el("span",{class:"what",text:L.status==="setup"?"Nenhum lance ainda. Escolham os times e comecem o 1º jogo.":"Nenhum lance ainda."}),el("span")));
@@ -1044,7 +1100,7 @@ function renderAoVivo(){
   lvTick();
 }
 function lvTick(){
-  if(tab!=="aovivo"||!myPid())return;
+  if(myPid()?tab!=="aovivo":!(S.visitor&&vtab==="aovivo"))return;
   const c=$("lvCountdown");if(c){const w=lvWindow(Date.now());if(lvOpen()){renderAoVivo();return}let t=Math.max(0,Math.floor((w.next-Date.now())/1000));
     c.replaceChildren(...[[Math.floor(t/86400),"dias"],[Math.floor(t%86400/3600),"horas"],[Math.floor(t%3600/60),"min"],[t%60,"seg"]].map(([n,l])=>el("div",{},el("b",{text:String(n).padStart(2,"0")}),el("span",{text:l}))));return}
   const L=lvState();const k=$("lvClock");
@@ -1099,7 +1155,7 @@ function confirmBtn(label,confirmLabel,fn,cls){
 }
 
 /* ---------- render ---------- */
-function render(){if(!renderShell()){renderLogin();if(S.visitor){if(vtab==="perfis")renderCards();else if(vtab==="resultados")renderResultados()}return}if(tab==="avaliar")renderAvaliar();else if(tab==="perfis")renderCards();else if(tab==="resultados")renderResultados();else if(tab==="aovivo")renderAoVivo();else if(tab==="sorteio")renderPick();else renderGrupo()}
+function render(){if(!renderShell()){renderLogin();if(S.visitor){if(vtab==="perfis")renderCards();else if(vtab==="resultados")renderResultados();else if(vtab==="aovivo")renderAoVivo()}return}if(tab==="avaliar")renderAvaliar();else if(tab==="perfis")renderCards();else if(tab==="resultados")renderResultados();else if(tab==="aovivo")renderAoVivo();else if(tab==="sorteio")renderPick();else renderGrupo()}
 
 /* ---------- início ---------- */
 let unsubs=[];
@@ -1114,7 +1170,7 @@ function startData(){
   const need=new Set(["players","ratings"]);
   const ready=n=>{if(need.delete(n)&&!need.size)S.loaded=true;render()};
   const fail=e=>{console.error(e);status("Não deu para carregar o grupo. Recarregue a página.",true)};
-  unsubs.push(S.db.collection("players").onSnapshot(s=>{S.players=new Map(s.docs.map(d=>[d.id,d.data()]));ready("players");schedulePub()},fail));
+  unsubs.push(S.db.collection("players").onSnapshot(s=>{S.players=new Map(s.docs.map(d=>[d.id,d.data()]));ready("players");schedulePub();lvAutoHome()},fail));
   if(S.isAdmin)unsubs.push(S.db.doc("public/profiles").onSnapshot(d=>{S.pubLast=d.exists?JSON.stringify(d.data().p||{}):null;S.pubAt=d.exists?d.data().at:null;if(tab==="grupo")renderNotesBox();schedulePub()},fail));
   unsubs.push(S.db.collection("ratings").onSnapshot(s=>{
     S.ratings=new Map(s.docs.map(d=>{const x=d.data();return [d.id,{scores:x.scores||{},raterPid:x.raterPid}]}));
@@ -1122,16 +1178,26 @@ function startData(){
     if(S.uid){S.savedMine=JSON.parse(JSON.stringify(S.ratings.get(S.uid)?.scores||{}));if(!S.dirty)S.mine=JSON.parse(JSON.stringify(S.savedMine))}ready("ratings");schedulePub()},fail));
   unsubs.push(S.db.doc("config/notes").onSnapshot(d=>{S.notes=d.exists?d.data():{locked:false};if(tab==="avaliar"&&!S.dirty)render();else if(tab==="grupo")renderNotesBox()},fail));
   unsubs.push(S.db.collection("matches").onSnapshot(s=>{S.matches=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.at-a.at);if(tab==="resultados"||tab==="perfis"||tab==="aovivo")render()},fail));
-  unsubs.push(onSnapshot(doc(fs,"live","current"),d=>{S.live=d.exists()?d.data():null;if(tab==="aovivo")renderAoVivo()},fail));
-  unsubs.push(S.db.doc("draws/latest").onSnapshot(d=>{if(d.exists){const x=d.data();const teams=[];for(let i=0;i<(x.k||0);i++)teams.push(x.teams["t"+i]||[]);S.savedGuests=x.guests||{};S.saved={teams,res:x.res||[],subs:x.subs?teams.map((_,i)=>x.subs["t"+i]||[]):null,at:x.at,manual:!!x.manual}}else S.saved=null;if(tab==="sorteio")renderResult();else if(tab==="aovivo")renderAoVivo()},fail));
+  unsubs.push(onSnapshot(doc(fs,"live","current"),d=>{S.live=d.exists()?d.data():null;lvAutoHome();if(tab==="aovivo")renderAoVivo()},fail));
+  unsubs.push(S.db.doc("draws/latest").onSnapshot(d=>{applyDraw(d);lvAutoHome();if(tab==="sorteio")renderResult();else if(tab==="aovivo")renderAoVivo()},fail));
   if(S.isAdmin)unsubs.push(S.db.collection("admins").onSnapshot(s=>{S.adminPhones=new Set(s.docs.map(d=>d.id));if(tab==="grupo")renderGrupo()},fail));
   if(S.isAdmin)unsubs.push(S.db.collection("phoneIndex").onSnapshot(s=>{S.phones=new Map(s.docs.map(d=>[d.data().pid,digitsOf(d.id)]));if(tab==="grupo")renderGrupo()},fail));
 }
-function resetState(){stopData();S.uid=null;S.isAdmin=S.isOwner=false;S.loaded=false;S.players=new Map();S.ratings=new Map();S.claims=new Map();S.phones=new Map();S.adminPhones=null;S.visitor=false;S.pub=null;S.pubLast=null;clearTimeout(pubTimer);S.live=null;S.lvPick=[];S.mine={};S.savedMine={};S.notes={locked:false};S.dirty=false;S.saved=null;S.draw=null;S.matches=[];MF=null}
+function resetState(){stopData();S.uid=null;S.isAdmin=S.isOwner=false;S.loaded=false;S.players=new Map();S.ratings=new Map();S.claims=new Map();S.phones=new Map();S.adminPhones=null;S.visitor=false;S.pub=null;S.pubLast=null;clearTimeout(pubTimer);S.live=null;S.lvPick=[];S.lvAutoDone=false;S.mine={};S.savedMine={};S.notes={locked:false};S.dirty=false;S.saved=null;S.draw=null;S.matches=[];MF=null}
 /* Lê o vínculo deste aparelho (claims/<uid>) e decide para onde ir. */
+function applyDraw(d){if(d.exists){const x=d.data();const teams=[];for(let i=0;i<(x.k||0);i++)teams.push(x.teams["t"+i]||[]);S.savedGuests=x.guests||{};S.saved={teams,res:x.res||[],subs:x.subs?teams.map((_,i)=>x.subs["t"+i]||[]):null,at:x.at,manual:!!x.manual}}else S.saved=null}
+/* com uma partida rolando, o app abre direto na aba Ao vivo (uma vez a cada entrada) */
+function lvAutoHome(){
+  if(S.lvAutoDone)return;if(!S.visitor&&!myPid())return;/* espera saber quem é a pessoa */
+  const L=S.live;if(!L||!S.saved||L.drawAt!==S.saved.at)return;
+  S.lvAutoDone=true;if(L.status!=="running")return;
+  if(myPid())tab="aovivo";else if(S.visitor)vtab="aovivo";render();
+}
 function startPublic(){
   stopData();S.visitor=true;
   const fail=e=>console.error(e);
+  unsubs.push(S.db.doc("draws/latest").onSnapshot(d=>{applyDraw(d);lvAutoHome();if(vtab==="aovivo")render()},fail));
+  unsubs.push(onSnapshot(doc(fs,"live","current"),d=>{S.live=d.exists()?d.data():null;lvAutoHome();if(vtab==="aovivo")render()},fail));
   unsubs.push(S.db.collection("players").onSnapshot(s=>{S.players=new Map(s.docs.map(d=>[d.id,d.data()]));render()},fail));
   unsubs.push(S.db.collection("matches").onSnapshot(s=>{S.matches=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.at-a.at);render()},fail));
   unsubs.push(S.db.doc("public/profiles").onSnapshot(d=>{S.pub=d.exists?d.data().p||{}:{};render()},fail));
