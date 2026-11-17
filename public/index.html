@@ -362,6 +362,26 @@ button.btn.lv-end{width:100%;margin-top:10px;background:var(--vest);border-color
 .tsubs li{padding:2px 0;overflow-wrap:anywhere}
 .tsubs li .n{color:var(--muted);font-size:13px;margin-left:6px}
 .lv-sub{font:600 11px var(--body);color:var(--muted);border:1px dashed var(--line);border-radius:999px;padding:0 6px}
+.dayres{margin-top:14px}
+.dayres .dhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.dayres .dhead h2{margin:0}
+.champ{margin-top:10px;border-radius:14px;padding:14px 16px;color:#fff;background:linear-gradient(135deg,var(--tc),color-mix(in srgb,var(--tc) 55%,#07142b));display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 8px 22px rgb(3 11 28 / .18)}
+.champ small{display:block;font:700 12px var(--body);letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+.champ b{display:block;font:800 34px/1 var(--display);text-transform:uppercase;margin-top:4px}
+.champ .pts{text-align:right;font:800 40px/1 var(--display);font-variant-numeric:tabular-nums}
+.champ .pts span{display:block;font:600 12px var(--body);opacity:.85}
+.champ.tie{background:linear-gradient(135deg,#3a4a6b,#07142b)}
+.ltbl td .tdot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--tc);margin-right:6px}
+.ltbl tr.first td{font-weight:700}
+.awards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+@media (max-width:420px){.awards{grid-template-columns:1fr}}
+.award{background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--ac);border-radius:12px;padding:10px 12px;min-width:0}
+.award small{display:block;font:700 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.award b{display:block;font:800 22px/1.1 var(--display);text-transform:uppercase;margin-top:4px;overflow-wrap:anywhere}
+.award span{display:block;font-size:13px;color:var(--muted);margin-top:2px}
+.shareRow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.shareRow .btn{flex:1 1 160px}
+button.btn.wa{background:#1f9d55;border-color:#1f9d55;color:#fff}
 .import{margin-top:18px;border:1px dashed var(--line);border-radius:10px;padding:10px 12px}
 .import summary{cursor:pointer;font:700 15px var(--display);text-transform:uppercase;letter-spacing:.04em}
 .import .row{margin-top:8px}
@@ -425,6 +445,7 @@ button.btn.lv-end{width:100%;margin-top:10px;background:var(--vest);border-color
   <section id="v-aovivo" hidden></section>
   <section id="v-resultados" hidden>
     <div id="matchForm"></div>
+    <section class="dayres" id="dayRes"></section>
     <h2>Artilharia</h2>
     <div id="topScorers"></div>
     <h2>Desempenho</h2>

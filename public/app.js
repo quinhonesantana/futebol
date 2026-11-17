@@ -587,6 +587,132 @@ function renderGrupo(){
       chip,acts));
   }
 }
+/* ---------- resumo da noite ---------- */
+/* Junta os jogos de um mesmo dia: classificação dos times (3 pontos por vitória, 1 por empate; desempate por saldo,
+   gols marcados e vitórias), artilheiro, líder de assistências, defesa menos vazada e o zagueiro que tomou menos gol. */
+const dayKey=ts=>{const d=new Date(ts);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
+let resDay=null;
+function daySummary(ms){
+  const T=new Map(),P=new Map();const t=i=>{if(!T.has(i))T.set(i,{i,j:0,v:0,e:0,d:0,gp:0,gc:0,pts:0});return T.get(i)};
+  const pl=(id,m)=>{if(!P.has(id))P.set(id,{id,name:m.names?.[id]||getP(id)?.name||"?",g:0,a:0,j:0,gc:0,cs:0});return P.get(id)};
+  for(const m of ms){
+    for(const [me,op] of [[m.a,m.b],[m.b,m.a]]){const x=t(me.team);x.j++;x.gp+=me.goals;x.gc+=op.goals;
+      if(me.goals>op.goals){x.v++;x.pts+=3}else if(me.goals===op.goals){x.e++;x.pts++}else x.d++;
+      for(const id of me.roster||[]){const p=pl(id,m);p.j++;p.gc+=op.goals;if(op.goals===0&&me.goals>op.goals)p.cs++}}
+    for(const [id,n] of Object.entries(m.scorers||{}))pl(id,m).g+=n;
+    for(const [id,n] of Object.entries(m.assists||{}))pl(id,m).a+=n;
+  }
+  const table=[...T.values()].sort((a,b)=>b.pts-a.pts||(b.gp-b.gc)-(a.gp-a.gc)||b.gp-a.gp||b.v-a.v||a.i-b.i);
+  return {table,players:[...P.values()]};
+}
+const joinNames=xs=>xs.length<=1?(xs[0]||""):xs.slice(0,-1).join(", ")+" e "+xs[xs.length-1];
+function leaders(list,val,better){if(!list.length)return null;let best=null;for(const x of list){const v=val(x);if(best===null||better(v,best))best=v}
+  return {v:best,who:list.filter(x=>val(x)===best)}}
+/* dados do resumo de um dia, usados na tela, na imagem e no texto do WhatsApp */
+function dayData(key){
+  const ms=S.matches.filter(m=>dayKey(m.at)===key).sort((a,b)=>a.at-b.at);if(!ms.length)return null;
+  const {table,players}=daySummary(ms);
+  const label=new Date(ms[0].at).toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit"});
+  const short=new Date(ms[0].at).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"});
+  const top=table[0],tied=table.filter(x=>x.pts===top.pts&&(x.gp-x.gc)===(top.gp-top.gc)&&x.gp===top.gp);
+  const awards=[];
+  const sc=leaders(players.filter(p=>p.g>0),p=>p.g,(a,b)=>a>b);
+  awards.push(sc?{t:"Artilheiro da noite",m:joinNames(sc.who.map(p=>p.name)),s:`${sc.v} ${sc.v===1?"gol":"gols"}`,c:"--vest"}:{t:"Artilheiro da noite",m:"Sem gols",s:"nenhum gol com autor",c:"--line"});
+  const as=leaders(players.filter(p=>p.a>0),p=>p.a,(a,b)=>a>b);
+  awards.push(as?{t:"Líder de assistências",m:joinNames(as.who.map(p=>p.name)),s:`${as.v} ${as.v===1?"assistência":"assistências"}`,c:"--pitch"}:{t:"Líder de assistências",m:"Sem registro",s:"nenhuma assistência marcada",c:"--line"});
+  const df=leaders(table,x=>x.gc/x.j,(a,b)=>a<b);const dfT=df.who.sort((a,b)=>b.j-a.j);
+  awards.push({t:"Defesa menos vazada",m:joinNames(dfT.map(x=>"Time "+TEAMS[x.i][0])),s:dfT.length===1?`${dfT[0].gc} ${dfT[0].gc===1?"gol sofrido":"gols sofridos"} em ${dfT[0].j} ${dfT[0].j===1?"jogo":"jogos"}`:`${fmt(df.v)} gol sofrido por jogo`,c:TEAMS[dfT[0].i][1]});
+  const zb=leaders(players.filter(p=>p.j>0&&S.players.has(p.id)&&isZag(p.id)),p=>p.gc/p.j,(a,b)=>a<b);
+  if(zb){const who=zb.who.sort((a,b)=>b.cs-a.cs||b.j-a.j);const best=who.filter(p=>p.cs===who[0].cs&&p.j===who[0].j);
+    awards.push({t:"Zagueiro que tomou menos gol",m:joinNames(best.map(p=>p.name)),s:best.length===1?`${best[0].gc} ${best[0].gc===1?"gol sofrido":"gols sofridos"} em ${best[0].j} ${best[0].j===1?"jogo":"jogos"}${best[0].cs?` · ${best[0].cs} ${best[0].cs===1?"vitória":"vitórias"} sem sofrer gol`:""}`:`${fmt(zb.v)} gol sofrido por jogo`,c:"--t3"})}
+  else awards.push({t:"Zagueiro que tomou menos gol",m:"Sem zagueiro",s:"nenhum zagueiro jogou",c:"--line"});
+  return {key,ms,table,label,short,top,tied,awards};
+}
+function renderDayResults(){
+  const box=$("dayRes");box.replaceChildren();
+  const days=[...new Set(S.matches.map(m=>dayKey(m.at)))].sort().reverse();if(!days.length)return;
+  if(!resDay||!days.includes(resDay))resDay=days[0];
+  const D=dayData(resDay);const {table,label,top,tied,ms}=D;
+  const sel=days.length>1?el("select",{id:"resDaySel","aria-label":"Escolher o dia"},...days.map(k=>{const m=S.matches.find(x=>dayKey(x.at)===k);return el("option",{value:k,text:new Date(m.at).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})})})):null;
+  if(sel){sel.value=resDay;sel.addEventListener("change",()=>{resDay=sel.value;renderDayResults()})}
+  box.append(el("div",{class:"dhead"},el("h2",{text:"Resumo da noite"}),sel||el("span",{class:"note",text:label})));
+  if(tied.length>1)box.append(el("div",{class:"champ tie"},el("div",{},el("small",{text:`${label} · ${ms.length} ${ms.length===1?"jogo":"jogos"}`}),el("b",{text:`Empate: ${joinNames(tied.map(x=>TEAMS[x.i][0]))}`})),el("div",{class:"pts",text:String(top.pts)},el("span",{text:"pontos cada"}))));
+  else box.append(el("div",{class:"champ",style:`--tc:var(${TEAMS[top.i][1]})`},el("div",{},el("small",{text:`Campeão da noite · ${label}`}),el("b",{text:`Time ${TEAMS[top.i][0]}`})),el("div",{class:"pts",text:String(top.pts)},el("span",{text:"pontos"}))));
+  box.append(el("div",{class:"tbl ltbl"},el("table",{},el("thead",{},el("tr",{},...[["Time",""],["P","Pontos"],["J","Jogos"],["V","Vitórias"],["E","Empates"],["D","Derrotas"],["GP","Gols marcados"],["GC","Gols sofridos"],["SG","Saldo de gols"]].map(([t,ti])=>el("th",{text:t,title:ti})))),
+    el("tbody",{},...table.map((x,k)=>el("tr",{class:k===0&&tied.length===1?"first":""},el("td",{},el("span",{class:"tdot",style:`--tc:var(${TEAMS[x.i][1]})`}),TEAMS[x.i][0]),...[x.pts,x.j,x.v,x.e,x.d,x.gp,x.gc,(x.gp-x.gc>0?"+":"")+(x.gp-x.gc)].map(v=>el("td",{text:String(v)}))))))));
+  box.append(el("div",{class:"awards"},...D.awards.map(a=>el("div",{class:"award",style:`--ac:var(${a.c})`},el("small",{text:a.t}),el("b",{text:a.m}),el("span",{text:a.s})))));
+  const msg=el("div",{class:"note",role:"status",style:"margin-top:6px"});
+  box.append(el("div",{class:"shareRow"},
+    el("button",{class:"btn primary",type:"button",text:"Baixar imagem",onclick:async ev=>{const b=ev.currentTarget;b.disabled=true;msg.textContent="Gerando a imagem…";
+      try{const blob=await dayImage(D);const a=el("a",{href:URL.createObjectURL(blob),download:`peixe-resumo-${D.key}.png`});document.body.append(a);a.click();a.remove();msg.textContent="Imagem baixada."}
+      catch(e){console.error(e);msg.textContent="Não deu para gerar a imagem neste aparelho."}finally{b.disabled=false}}}),
+    el("button",{class:"btn wa",type:"button",text:"Compartilhar no WhatsApp",onclick:async ev=>{const b=ev.currentTarget;b.disabled=true;
+      const text=dayText(D);
+      try{const blob=await dayImage(D);const file=new File([blob],`peixe-resumo-${D.key}.png`,{type:"image/png"});
+        if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],text});msg.textContent=""}
+        else{window.open("https://wa.me/?text="+encodeURIComponent(text),"_blank","noopener");msg.textContent="Este aparelho não envia imagem direto. Abrimos o WhatsApp com o texto; para mandar a imagem, use Baixar imagem."}}
+      catch(e){if(e&&e.name==="AbortError"){msg.textContent=""}else{window.open("https://wa.me/?text="+encodeURIComponent(text),"_blank","noopener")}}
+      finally{b.disabled=false}}})),msg);
+}
+/* texto do resumo para o WhatsApp */
+function dayText(D){
+  let s=`⚽ *Peixe Futebol Clube* · resumo da noite ${D.short}\n\n`;
+  s+=D.tied.length>1?`Empate na liderança: ${joinNames(D.tied.map(x=>"Time "+TEAMS[x.i][0]))} (${D.top.pts} ${D.top.pts===1?"pt":"pts"})\n`:`🏆 Campeão: *Time ${TEAMS[D.top.i][0]}* (${D.top.pts} ${D.top.pts===1?"pt":"pts"})\n`;
+  s+=`\n*Classificação*\n`+D.table.map((x,k)=>`${k+1}º ${TEAMS[x.i][0]} · ${x.pts} ${x.pts===1?"pt":"pts"} (${x.v}V ${x.e}E ${x.d}D, saldo ${x.gp-x.gc>0?"+":""}${x.gp-x.gc})`).join("\n");
+  s+=`\n\n`+D.awards.map(a=>`*${a.t}:* ${a.m} (${a.s})`).join("\n");
+  return s+`\n\nfut-peixe.netlify.app`;
+}
+/* desenha o resumo numa imagem 1080 × 1350 (formato de post), com as cores e o escudo do Peixe */
+let crestImg=null;
+function loadCrest(){if(crestImg)return Promise.resolve(crestImg);return new Promise((ok,ko)=>{const i=new Image();i.onload=()=>{crestImg=i;ok(i)};i.onerror=ko;i.src="logo.jpg"})}
+async function dayImage(D){
+  try{await Promise.all([document.fonts.load('800 60px "Barlow Condensed"'),document.fonts.load('600 30px Inter'),document.fonts.load('700 30px Inter')])}catch(e){}
+  const crest=await loadCrest().catch(()=>null);
+  const css=getComputedStyle(document.documentElement);const col=v=>(css.getPropertyValue(v)||"").trim()||"#2f6fd6";
+  const W=1080,H=1350,c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d");
+  const DISP='"Barlow Condensed","Arial Narrow",sans-serif',BODY='Inter,system-ui,sans-serif';
+  const fit=(txt,max,size,weight,fam)=>{let s=size;g.font=`${weight} ${s}px ${fam}`;while(g.measureText(txt).width>max&&s>18){s-=2;g.font=`${weight} ${s}px ${fam}`}return s};
+  const rr=(x,y,w,h,r)=>{g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()};
+  /* fundo */
+  let bg=g.createLinearGradient(0,0,0,H);bg.addColorStop(0,"#0f2247");bg.addColorStop(1,"#050f24");g.fillStyle=bg;g.fillRect(0,0,W,H);
+  g.fillStyle="#d9a62b";g.fillRect(0,170,W,6);
+  if(crest){g.save();rr(56,34,110,110,20);g.clip();g.drawImage(crest,56,34,110,110);g.restore()}
+  g.fillStyle="#c9d4ea";g.font=`600 28px ${BODY}`;g.textBaseline="alphabetic";g.fillText(`Resumo da noite · ${D.label}`,190,78);
+  g.fillStyle="#fff";g.font=`800 70px ${DISP}`;g.fillText("PEIXE FUTEBOL CLUBE",190,142);
+  /* campeão */
+  let y=210;const champC=D.tied.length>1?"#3a4a6b":col(TEAMS[D.top.i][1]);
+  rr(56,y,W-112,190,26);let cg=g.createLinearGradient(56,y,W-56,y+190);cg.addColorStop(0,champC);cg.addColorStop(1,"#0a1d3d");g.fillStyle=cg;g.fill();
+  g.fillStyle="rgba(255,255,255,.85)";g.font=`700 26px ${BODY}`;g.fillText(D.tied.length>1?`EMPATE NA LIDERANÇA · ${D.ms.length} ${D.ms.length===1?"JOGO":"JOGOS"}`:`CAMPEÃO DA NOITE · ${D.ms.length} ${D.ms.length===1?"JOGO":"JOGOS"}`,92,y+56);
+  const champTxt=(D.tied.length>1?joinNames(D.tied.map(x=>TEAMS[x.i][0])):`TIME ${TEAMS[D.top.i][0]}`).toUpperCase();
+  g.fillStyle="#fff";fit(champTxt,640,96,800,DISP);g.fillText(champTxt,92,y+150);
+  g.textAlign="right";g.font=`800 120px ${DISP}`;g.fillText(String(D.top.pts),W-92,y+140);g.font=`600 26px ${BODY}`;g.fillStyle="rgba(255,255,255,.85)";g.fillText(D.tied.length>1?"pontos cada":"pontos",W-92,y+174);g.textAlign="left";
+  /* classificação */
+  y=440;rr(56,y,W-112,70+D.table.length*62,22);g.fillStyle="rgba(255,255,255,.06)";g.fill();
+  const cols=[["P",560],["J",640],["V",715],["E",790],["D",865],["SG",960]];
+  g.fillStyle="#9fb0d0";g.font=`700 24px ${BODY}`;g.fillText("CLASSIFICAÇÃO",88,y+46);g.textAlign="center";for(const [t,x] of cols)g.fillText(t,x,y+46);g.textAlign="left";
+  D.table.forEach((x,k)=>{const ry=y+70+k*62;g.fillStyle="rgba(255,255,255,.08)";g.fillRect(88,ry,W-176,1);
+    g.fillStyle=col(TEAMS[x.i][1]);g.beginPath();g.arc(104,ry+32,11,0,7);g.fill();
+    g.fillStyle="#fff";g.font=`${k===0?800:700} 40px ${DISP}`;g.fillText(`${k+1}º  ${TEAMS[x.i][0].toUpperCase()}`,128,ry+45);
+    g.font=`${k===0?700:600} 30px ${BODY}`;g.textAlign="center";const sg=x.gp-x.gc;
+    [x.pts,x.j,x.v,x.e,x.d,(sg>0?"+":"")+sg].forEach((v,j)=>{g.fillStyle=j===0?"#f2c94c":"#e8eef9";g.fillText(String(v),cols[j][1],ry+43)});g.textAlign="left"});
+  /* destaques 2 × 2 */
+  y=440+70+D.table.length*62+30;const bw=(W-112-24)/2,bh=180;
+  D.awards.forEach((a,k)=>{const x=56+(k%2)*(bw+24),yy=y+Math.floor(k/2)*(bh+24);
+    rr(x,yy,bw,bh,20);g.fillStyle="#fff";g.fill();g.save();rr(x,yy,bw,bh,20);g.clip();g.fillStyle=a.c==="--line"?"#9fb0d0":col(a.c);g.fillRect(x,yy,12,bh);g.restore();
+    g.fillStyle="#596479";g.font=`700 22px ${BODY}`;g.fillText(a.t.toUpperCase(),x+36,yy+46);
+    g.fillStyle="#111a2c";const m=a.m.toUpperCase();fit(m,bw-60,52,800,DISP);g.fillText(m,x+36,yy+108);
+    g.fillStyle="#596479";fit(a.s,bw-60,24,500,BODY);g.fillText(a.s,x+36,yy+150)});
+  /* placares da noite, em duas colunas, até onde couber */
+  let gy=y+2*(bh+24)+16;const lineH=42,room=Math.max(0,Math.floor((H-76-(gy+40))/lineH))*2;
+  if(room>0){const cut=D.ms.length>room;g.fillStyle="#9fb0d0";g.font=`700 24px ${BODY}`;g.fillText(cut?`ÚLTIMOS ${room} DE ${D.ms.length} JOGOS`:"JOGOS DA NOITE",56,gy+24);gy+=40;
+    const list=cut?D.ms.slice(-room):D.ms;const half=Math.ceil(list.length/2);
+    list.forEach((m,k)=>{const cx=56+(k<half?0:(W-112)/2),cy=gy+(k%half)*lineH+30;
+      g.fillStyle=col(TEAMS[m.a.team][1]);g.beginPath();g.arc(cx+9,cy-10,8,0,7);g.fill();
+      g.fillStyle="#fff";g.font=`700 32px ${DISP}`;const t=`${TEAMS[m.a.team][0].toUpperCase()} ${m.a.goals} x ${m.b.goals} ${TEAMS[m.b.team][0].toUpperCase()}`;g.fillText(t,cx+26,cy);
+      const w=g.measureText(t).width;g.fillStyle=col(TEAMS[m.b.team][1]);g.beginPath();g.arc(cx+26+w+16,cy-10,8,0,7);g.fill()})}
+  g.fillStyle="#9fb0d0";g.font=`600 24px ${BODY}`;g.textAlign="center";g.fillText("fut-peixe.netlify.app",W/2,H-36);g.textAlign="left";
+  return await new Promise((ok,ko)=>c.toBlob(b=>b?ok(b):ko(new Error("toBlob")),"image/png"));
+}
 /* ---------- resultados ---------- */
 S.matches=[];S.notes={locked:false};S.savedMine={};let MF=null;
 {const u=ls("usePerf");if(u===false)$("usePerf").checked=false}
@@ -662,7 +788,7 @@ function renderMatchForm(){
   f.append(teams,save,err);box.append(f);
 }
 function renderResultados(){
-  renderMatchForm();
+  renderMatchForm();renderDayResults();
   const st=stats();const rows=[...st.entries()].filter(([,x])=>x.j>0).map(([id,x])=>({id,...x,name:S.players.get(id).name}));
   const top=$("topScorers");top.replaceChildren();
   const sc=rows.filter(r=>r.g>0).sort((a,b)=>b.g-a.g||a.j-b.j||a.name.localeCompare(b.name,"pt-BR")).slice(0,10);

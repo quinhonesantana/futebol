@@ -70,6 +70,9 @@ Firebase → **Authentication** → **Configurações** → **Domínios autoriza
 3. Cadastre os jogadores com nome, celular e posição.
 4. Mande o link no grupo do WhatsApp. Cada um entra digitando o próprio celular.
 
+## Resumo da noite
+No topo da aba **Resultados**, o app junta os jogos do dia: classificação dos times no padrão de liga (3 pontos por vitória, 1 por empate; desempate por saldo, gols marcados e vitórias), o campeão da noite e quatro destaques: artilheiro, líder de assistências, defesa menos vazada (menos gols sofridos por jogo) e o zagueiro que tomou menos gol. Dá para escolher dias anteriores. O botão **Baixar imagem** gera um card 1080 × 1350 com tudo isso, e **Compartilhar no WhatsApp** envia a imagem pelo menu do celular (no computador, abre o WhatsApp com o resumo em texto).
+
 ## Perfis de acesso
 
 | | Organizador | Jogador |
