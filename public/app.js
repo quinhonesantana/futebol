@@ -270,16 +270,24 @@ function secLine(sec){
   if(sec.tie)return el("div",{class:"secline",text:`2ª posição: empate entre ${sec.tie.map(k=>POS[k][0]).join(" e ")}`});
   return el("div",{class:"secline",text:"2ª posição: sem votos ainda"});
 }
+/* Nota geral = média das notas do grupo + ajuste de desempenho nos jogos (entre −0,5 e +0,5), sempre entre 1 e 5.
+   Nos cards de Jogadores o ajuste sempre entra; no sorteio, só com a opção "Usar resultados dos jogos" ligada. */
+let ADJ=null;
+function adjMap(){if(!ADJ||ADJ.m!==S.matches||ADJ.p!==S.players)ADJ={m:S.matches,p:S.players,map:perfAdj()};return ADJ.map}
+const adjOf=id=>isGuest(id)?0:(adjMap().get(id)||0);
+const perfOn=()=>$("usePerf").checked;
+function noteOf(id,withAdj){const b=rate(id).ovr;if(b==null)return null;return Math.max(1,Math.min(5,b+(withAdj?adjOf(id):0)))}
+const fmtAdj=a=>(a>=0?"+":"−")+Math.abs(a).toFixed(2).replace(".",",");
 function renderCards(){
   const c=$("cards");c.replaceChildren();
-  const ps=sortedPlayers().map(p=>({...p,pr:profile(p.id)})).sort((a,b)=>(b.pr.ovr??-1)-(a.pr.ovr??-1)||a.name.localeCompare(b.name,"pt-BR"));
+  const ps=sortedPlayers().map(p=>({...p,pr:profile(p.id),nt:noteOf(p.id,true)})).sort((a,b)=>(b.nt??-1)-(a.nt??-1)||a.name.localeCompare(b.name,"pt-BR"));
   if(!ps.length){c.append(el("div",{class:"empty",style:"grid-column:1/-1"},el("strong",{text:"Nenhum jogador ainda"}),"Os jogadores aparecem aqui quando o organizador cadastrar o grupo."));return}
   const me=myPid();
   for(const p of ps){const r=p.pr.raters;
     c.append(el("div",{class:"card"},
-      el("div",{class:"top"},el("div",{class:"ovr"+(p.pr.ovr==null?" none":""),text:fmt(p.pr.ovr)}),
+      el("div",{class:"top"},el("div",{class:"ovr"+(p.nt==null?" none":""),text:fmt(p.nt)}),
         el("div",{class:"meta"},el("div",{class:"pname",text:p.name+(p.id===me?" (você)":"")}),el("div",{class:"row",style:"gap:6px;margin-top:3px"},posTag(p),isOrg(p.id)?orgChip():null,el("span",{class:"note",text:r?`${r} ${r===1?"avaliação":"avaliações"}`:"sem avaliações"})))),
-      secLine(p.pr.sec),perfLine(p.id),
+      secLine(p.pr.sec),p.pr.ovr!=null&&stats().get(p.id)?.j?el("div",{class:"adjline"},`Notas do grupo ${p.pr.ovr.toFixed(2).replace(".",",")} · desempenho nos jogos `,el("b",{class:adjOf(p.id)>0.005?"up":adjOf(p.id)<-0.005?"down":"",text:fmtAdj(adjOf(p.id))})):null,perfLine(p.id),
       ...ATTRS.map(([k,,code])=>statRow(k,code,p.pr.avg[k]))));
   }
 }
@@ -304,7 +312,7 @@ function renderPick(){
     const cb=el("input",{type:"checkbox",id:"pr-"+p.id});cb.checked=present.has(p.id);
     cb.addEventListener("change",()=>{present.delete(p.id);if(cb.checked)present.add(p.id);savePresent();renderPick()});
     const ord=[...present].filter(id=>hasP(id)).indexOf(p.id);
-    box.append(el("label",{for:"pr-"+p.id},cb,el("span",{class:"ord",title:"Ordem de chegada",text:ord>=0?ord+1+"º":""}),el("span",{text:p.name}),posTag(p,true),el("span",{class:"ovrs",title:"Nota geral",text:fmt(rate(p.id).ovr)})));
+    box.append(el("label",{for:"pr-"+p.id},cb,el("span",{class:"ord",title:"Ordem de chegada",text:ord>=0?ord+1+"º":""}),el("span",{text:p.name}),posTag(p,true),el("span",{class:"ovrs",title:"Nota geral",text:fmt(noteOf(p.id,perfOn()))})));
   }
   const gs=[...S.guests.entries()];
   if(gs.length)box.append(el("div",{class:"ghead",text:`Convidados (${gs.length})`}));
@@ -389,9 +397,9 @@ $("drawBtn").addEventListener("click",()=>{
    Reparte os reservas (o mais forte primeiro) mantendo o número igual, as posições equilibradas
    e a força total dos dois times parecida. Dentro de cada time, eles ficam na ordem de chegada. */
 const TOP=4;
-const isTop=id=>(rate(id).ovr??0)>=TOP;
+const isTop=id=>(noteOf(id,perfOn())??0)>=TOP;
 function splitReserves(teams,res){
-  const subs=teams.map(()=>[]);const ovr=id=>rate(id).ovr??3;
+  const subs=teams.map(()=>[]);const ovr=id=>noteOf(id,perfOn())??3;
   const power=i=>[...teams[i],...subs[i]].reduce((q,id)=>q+ovr(id),0);
   for(const id of [...res].sort((a,b)=>ovr(b)-ovr(a))){
     const n=subs.map(x=>x.length),min=Math.min(...n);let cand=[...subs.keys()].filter(i=>n[i]===min);
@@ -402,7 +410,7 @@ function splitReserves(teams,res){
   for(const x of subs)x.sort((a,b)=>res.indexOf(a)-res.indexOf(b));
   return subs;
 }
-function teamStats(t){const f=t;const avg=key=>{const v=f.map(id=>{const p=rate(id);return key==="ovr"?(p.ovr??3):(p.avg[key]??p.ovr??3)});return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};return {ovr:avg("ovr"),attrs:ATTRS.map(([k,,c])=>[c,avg(k)])}}
+function teamStats(t){const f=t;const avg=key=>{const v=f.map(id=>{const p=rate(id);const a=perfOn()?adjOf(id):0;return key==="ovr"?(p.ovr??3)+a:(p.avg[key]??p.ovr??3)+a});return v.length?v.reduce((a,b)=>a+b,0)/v.length:null};return {ovr:avg("ovr"),attrs:ATTRS.map(([k,,c])=>[c,avg(k)])}}
 function dateBR(ts){return new Date(ts).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"})}
 function waText(teams,at,res,subs){let s=`⚽ Peixe Futebol Clube · times de ${dateBR(at)}\n`;teams.forEach((t,i)=>{const st=teamStats(t);s+=`\n*Time ${TEAMS[i][0]}* (média ${fmt(st.ovr)})\n`;t.forEach(id=>{const p=hasP(id)?{id,...getP(id)}:null;if(p)s+=`- ${dName(id)} (${posLabel(p)})\n`});const sb=(subs&&subs[i])||[];if(sb.length)s+=`_Reservas:_ ${sb.map(id=>`${dName(id)} (${posLabel({id,...getP(id)})})`).join(", ")}\n`});
   if(res.length){s+=`\n*Reservas* (entram por ordem de chegada)\n`;res.forEach((id,i)=>{const p={id,...getP(id)};s+=`${i+1}. ${dName(id)} (${posLabel(p)})\n`})}
@@ -430,8 +438,8 @@ function renderResult(){
     grid.append(el("div",{class:"team",style:`--tc:var(${TEAMS[i][1]})`},
       el("h3",{},"Time "+TEAMS[i][0],el("small",{text:`média ${fmt(st.ovr)} · ${t.length} jog.${subs&&subs[i].length?` + ${subs[i].length} res.`:""}`})),
       (()=>{const n=[...t,...(subs?subs[i]:[])].filter(isTop).length;return n?el("div",{class:"topline",text:`${n} ${n===1?"jogador":"jogadores"} nível 4`}):null})(),
-      el("ol",{},...t.map(id=>{const p={id,...getP(id)};const pr=rate(id);return el("li",{},dName(id)," ",posTag(p,true),el("span",{class:"n"+(isTop(id)?" top":""),text:fmt(pr.ovr)}),moveBtn(id))})),
-      subs&&subs[i].length?el("div",{class:"tsubs"},el("b",{text:"Reservas do time"}),el("ul",{},...subs[i].map(id=>{const p={id,...getP(id)};return el("li",{},dName(id)," ",posTag(p,true),el("span",{class:"n",text:fmt(rate(id).ovr)}),moveBtn(id))}))):null,
+      el("ol",{},...t.map(id=>{const p={id,...getP(id)};const pr=rate(id);return el("li",{},dName(id)," ",posTag(p,true),el("span",{class:"n"+(isTop(id)?" top":""),text:fmt(noteOf(id,perfOn()))}),moveBtn(id))})),
+      subs&&subs[i].length?el("div",{class:"tsubs"},el("b",{text:"Reservas do time"}),el("ul",{},...subs[i].map(id=>{const p={id,...getP(id)};return el("li",{},dName(id)," ",posTag(p,true),el("span",{class:"n",text:fmt(noteOf(id,perfOn()))}),moveBtn(id))}))):null,
       el("div",{class:"tstats"},...st.attrs.flatMap(([c,v],i)=>[i?"  ·  ":"",tip(ATTRS[i][0],c)," "+fmt(v)]))))});
   r.append(grid);
   if(res.length)r.append(el("div",{class:"res"},el("h3",{text:`Reservas (${res.length})`}),el("p",{class:"note",style:"margin:2px 0 0",text:"Entram por ordem de chegada."}),
@@ -445,7 +453,7 @@ function renderResult(){
     try{if(S.saved&&S.saved.at!==d.at)await archiveDraw();await S.db.doc("draws/latest").set({teams:Object.fromEntries(teams.map((t,i)=>["t"+i,t])),k:teams.length,res,subs:subs?Object.fromEntries(subs.map((x,i)=>["t"+i,x])):null,manual:!!d.manual,guests:Object.fromEntries([...teams.flat(),...res,...(subs||[]).flat()].filter(isGuest).map(id=>{const g=getP(id);return [id,{name:g.name,pos:g.pos,lvl:+g.lvl||3}]})),at:d.at});b.textContent="Publicado para todos";S.draw=null;status("Sorteio publicado. Todo o grupo já vê os times na aba Sorteio. Ainda dá para mover alguém tocando em Mover.")}catch(e){b.disabled=false;status(e.code==="permission-denied"?"Só organizadores podem publicar o sorteio.":"Não foi possível publicar o sorteio.",true)}}}));
   if(S.isAdmin&&S.saved){const running=S.live&&S.live.drawAt===S.saved.at&&S.live.status==="running";
     acts.append(confirmBtn(S.draw?"Cancelar sorteio publicado":"Cancelar publicação",running?"Toque de novo: cancela e para a partida ao vivo sem salvar":"Toque de novo: o grupo deixa de ver os times",cancelPublish,"btn danger"))}
-  r.append(acts,box,el("p",{class:"note",style:"margin-top:8px",text:"O número ao lado do nome é a nota geral do perfil."}));
+  r.append(acts,box,el("p",{class:"note",style:"margin-top:8px",text:"O número ao lado do nome é a nota geral do perfil"+(perfOn()?", já com o ajuste de desempenho nos jogos.":".")}));
 }
 
 /* ---------- ajuste manual do sorteio (organizador) ---------- */
@@ -740,7 +748,7 @@ async function dayImage(D){
 /* ---------- resultados ---------- */
 S.matches=[];S.notes={locked:false};S.savedMine={};let MF=null;
 {const u=ls("usePerf");if(u===false)$("usePerf").checked=false}
-$("usePerf").addEventListener("change",()=>ls("usePerf",$("usePerf").checked));
+$("usePerf").addEventListener("change",()=>{ls("usePerf",$("usePerf").checked);renderPick()});
 const isZag=id=>posOf(S.players.get(id))==="zag";
 function stats(ms){ms=ms||S.matches;
   const st=new Map();const get=id=>{if(!st.has(id))st.set(id,{j:0,v:0,e:0,d:0,g:0,a:0,cs:0,pts:0,gp:0,gc:0});return st.get(id)};
@@ -879,7 +887,7 @@ function renderResultados(){
     el("tbody",{},...sc.map((r,i)=>el("tr",{},el("td",{},el("span",{class:"n",text:i+1+"º "}),r.name),el("td",{text:String(r.g)}),el("td",{text:String(r.j)}),el("td",{text:fmt(r.g/r.j)})))))));
   const pt=$("perfTable");pt.replaceChildren();
   if(!rows.length)pt.append(el("div",{class:"empty",style:"margin-top:10px"},el("strong",{text:"Sem jogos ainda"}),"Vitórias, empates e derrotas de cada um aparecem aqui."));
-  else{const adj=perfAdj();rows.sort((a,b)=>b.pts-a.pts||b.v-a.v||b.g-a.g||a.name.localeCompare(b.name,"pt-BR"));
+  else{const adj=adjMap();rows.sort((a,b)=>b.pts-a.pts||b.v-a.v||b.g-a.g||a.name.localeCompare(b.name,"pt-BR"));
     pt.append(el("div",{class:"tbl"},el("table",{},el("thead",{},el("tr",{},...[["Jogador",""],["J","Jogos"],["V","Vitórias"],["E","Empates"],["D","Derrotas"],["G","Gols"],["A","Assistências"],["VSG","Vitórias sem sofrer gol (só zagueiros)"],["Pts","Pontos"],["Ajuste","Quanto o desempenho soma ou tira da nota geral no sorteio"]].map(([t,ti])=>el("th",{text:t,title:ti})))),
       el("tbody",{},...rows.map(r=>{const a=adj.get(r.id)||0;return el("tr",{},el("td",{text:r.name}),...[r.j,r.v,r.e,r.d,r.g,r.a,isZag(r.id)?r.cs:"–",r.pts].map(v=>el("td",{text:String(v)})),el("td",{class:"n",text:(a>=0?"+":"−")+Math.abs(a).toFixed(2).replace(".",",")}))})))))}
   const ml=$("matchList");ml.replaceChildren();
