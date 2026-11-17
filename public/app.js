@@ -706,7 +706,9 @@ function lvFmt(){return (S.saved?.teams?.length||0)===2?"2":"3"}
 function lvState(){
   const L=S.live;if(L&&S.saved&&L.drawAt===S.saved.at)return L;
   const fmt=lvFmt();return {drawAt:S.saved?.at,fmt,status:fmt==="2"?"ready":"setup",a:fmt==="2"?0:null,b:fmt==="2"?1:null,queue:[],streak:{},gameNo:0,events:[],startedAt:null,sessionStart:null,dur:fmt==="2"?LV.SESSION:LV.MATCH3,fresh:true}}
-function lvOpen(){if(!S.saved)return false;const L=lvState();if(L.status==="running")return true;if((L.forceUntil||0)>Date.now())return true;return lvWindow(Date.now()).open}
+function lvOpen(){if(!S.saved)return false;const L=lvState();if(L.status==="running")return true;
+  /* depois de encerrar o ao vivo, o resumo do dia fica na tela por 12 horas */
+  if(L.status==="done"&&L.closedAt&&Date.now()-L.closedAt<12*3600e3)return true;if((L.forceUntil||0)>Date.now())return true;return lvWindow(Date.now()).open}
 const lvIds=i=>[...(S.saved.teams[i]||[]),...((S.saved.subs||[])[i]||[])].filter(hasP);
 const lvIsSub=(i,id)=>((S.saved.subs||[])[i]||[]).includes(id);
 const lvTeam=i=>({name:TEAMS[i][0],c:`var(${TEAMS[i][1]})`,ids:lvIds(i)});
@@ -774,6 +776,17 @@ async function lvCancelStart(expectedGame){
     else{tx.set(liveRef(),{...L,status:"ready",startedAt:null,sessionStart:first?null:L.sessionStart,events:[]});msg="Início cancelado. A partida voltou para antes do começo."}});
   if(ok){S.lvPick=[];lvAwake(false);lvToast(msg)}
 }
+/* Encerra a partida ao vivo do dia (organizador). Só quando não há jogo rolando; os jogos já encerrados continuam em Resultados. */
+async function lvCloseDay(){
+  const ok=await lvTx(async(tx,cur)=>{const L=cur&&cur.drawAt===S.saved.at?cur:lvState();
+    if(L.status==="running")throw new Error("lv:Tem uma partida rolando. Encerre ou cancele a partida antes de fechar o ao vivo.");
+    tx.set(liveRef(),{...L,fresh:null,drawAt:S.saved.at,status:"done",forceUntil:0,closedAt:Date.now(),closedBy:myPid()})});
+  if(ok){lvAwake(false);lvToast("Ao vivo encerrado. Valeu, Peixe!")}
+}
+async function lvReopen(){const until=Date.now()+3*3600e3;
+  const ok=await lvTx(async(tx,cur)=>{const L=cur&&cur.drawAt===S.saved.at?cur:lvState();
+    tx.set(liveRef(),{...L,fresh:null,drawAt:S.saved.at,status:L.a!=null?"ready":"setup",forceUntil:until,closedAt:null})});
+  if(ok)lvToast("Ao vivo reaberto pelas próximas 3 horas.")}
 async function lvForceOpen(){const until=Date.now()+3*3600e3;
   const ok=await lvTx(async(tx,cur)=>{const L=cur&&cur.drawAt===S.saved.at?cur:lvState();tx.set(liveRef(),{...L,fresh:null,drawAt:S.saved.at,forceUntil:until})});
   if(ok)lvToast("Partida ao vivo aberta pelas próximas 3 horas.")}
@@ -830,8 +843,10 @@ function renderAoVivo(){
   const box=$("v-aovivo");box.replaceChildren();
   if(!lvOpen()){lvWaiting(box);return}
   const L=lvState();const fmt=L.fmt;
-  if(L.status==="done"){const ms=S.matches.filter(m=>m.drawAt===S.saved.at);box.append(el("div",{class:"lv-gate"},el("img",{src:"logo.jpg",alt:"",class:"lv-crest"}),el("span",{class:"lv-state",text:"Pelada encerrada"}),el("h2",{text:"Valeu, Peixe!"}),
-    el("p",{class:"note",text:"O resultado já está na aba Resultados."}),...ms.map(m=>el("div",{class:"lv-gameline"},TEAMS[m.a.team][0],el("b",{text:` ${m.a.goals} x ${m.b.goals} `}),TEAMS[m.b.team][0]))));return}
+  if(L.status==="done"){const ms=S.matches.filter(m=>m.drawAt===S.saved.at).sort((a,b)=>a.at-b.at);box.append(el("div",{class:"lv-gate"},el("img",{src:"logo.jpg",alt:"",class:"lv-crest"}),el("span",{class:"lv-state",text:"Pelada encerrada"}),el("h2",{text:"Valeu, Peixe!"}),
+    el("p",{class:"note",text:ms.length?`${ms.length===1?"Foi 1 jogo":`Foram ${ms.length} jogos`} hoje. Os resultados já estão na aba Resultados.`:"Nenhum jogo foi encerrado hoje."}),...ms.map(m=>el("div",{class:"lv-gameline"},TEAMS[m.a.team][0],el("b",{text:` ${m.a.goals} x ${m.b.goals} `}),TEAMS[m.b.team][0])),
+    el("p",{class:"note",text:`A próxima abre ${new Date(lvWindow(Date.now()+12*3600e3).next).toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit"})} às 19:30.`}),
+    S.isAdmin?confirmBtn("Reabrir o ao vivo","Toque de novo: reabre por 3 horas",lvReopen,"btn"):null));return}
   /* placar */
   const board=el("section",{class:"lv-board","aria-label":"Placar"});
   const st=L.status==="setup"?["paused","Não começou"]:L.status==="ready"?["paused","Não começou"]:lvRemaining(L)<=0?["over","Fim do tempo"]:["","Ao vivo"];
@@ -862,6 +877,7 @@ function renderAoVivo(){
     else ctl.append(el("button",{class:"btn primary big",type:"button",style:"width:100%",text:fmt==="2"?"Começar a pelada":`Começar ${TEAMS[L.a][0]} x ${TEAMS[L.b][0]}`,onclick:lvStart}));
     ctl.append(el("p",{class:"note",style:"margin:8px 0 0",text:fmt==="2"?"Com 2 times o jogo vai direto até o fim da 1h30. As substituições não precisam ser marcadas.":"Qualquer jogador pode começar e encerrar a partida e marcar gols. O seu nome fica registrado."}));
   }
+  if(S.isAdmin&&L.status!=="running")ctl.append(el("div",{class:"lv-closeday"},confirmBtn("Encerrar o ao vivo de hoje","Toque de novo: fecha a partida ao vivo para todos",lvCloseDay,"btn danger")));
   box.append(ctl);
   /* lances */
   const tl=el("ul",{class:"lv-tl"});const evs=[...(L.events||[])].reverse();

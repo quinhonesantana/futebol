@@ -95,7 +95,8 @@ A aba **Ao vivo** abre toda **segunda-feira às 19:30**, desde que o sorteio est
 - **2 times:** um jogo só, direto até o fim da 1h30. Substituições não são marcadas.
 - Qualquer jogador ou organizador começa, marca gols (com assistência e gol contra) e encerra. Cada ação mostra quem fez.
 - Se a partida começar por engano, **Cancelar início** volta para antes do começo (no 1º jogo com 3 times, para a escolha de quem começa) e apaga os gols marcados; nada vai para Resultados.
-- Ao encerrar, o jogo vai sozinho para a aba **Resultados**. Se o primeiro jogo do mês for encerrado, as notas travam.
+- Ao encerrar, o jogo vai sozinho para a aba **Resultados**.
+- No fim da pelada, um organizador pode tocar em **Encerrar o ao vivo de hoje** (sem jogo rolando). Todos passam a ver o resumo "Valeu, Peixe!" com os jogos do dia por 12 horas, e o organizador pode **Reabrir o ao vivo** por 3 horas se precisar. Se o primeiro jogo do mês for encerrado, as notas travam.
 - Tudo é compartilhado em tempo real entre os celulares. Dois toques em "Encerrar" ao mesmo tempo não duplicam o jogo.
 
 ## Quando as notas travam
