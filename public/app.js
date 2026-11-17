@@ -73,7 +73,7 @@ let tab=ls("tab")||"avaliar";
 /* avisa o Tag Manager de cada aba aberta, já que o app não troca de página */
 const TAB_NAMES={perfis:"jogadores",aovivo:"ao_vivo"};
 function track(name){try{(window.dataLayer=window.dataLayer||[]).push({event:"aba_aberta",aba:TAB_NAMES[name]||name,visitante:!myPid()})}catch(e){}}
-function setTab(t){tab=t;ls("tab",t);track(t);render()}
+function setTab(t){if(t!==tab)status("");tab=t;ls("tab",t);track(t);render()}
 let vtab=ls("vtab")||"entrar";
 document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>{if(!myPid()){vtab=b.dataset.tab;ls("vtab",vtab);track(vtab);render();window.scrollTo({top:0});return}setTab(b.dataset.tab)}));
 const VIEWS=["avaliar","perfis","sorteio","aovivo","resultados","grupo"];
@@ -844,7 +844,7 @@ const lvMin=L=>Math.min(Math.ceil((L.dur||0)/60),Math.floor(lvElapsed(L)/60)+1);
 const lvClock=s=>{s=Math.ceil(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=String(s%60).padStart(2,"0");return h?`${h}:${String(m).padStart(2,"0")}:${x}`:`${String(m).padStart(2,"0")}:${x}`};
 function lvGoals(L,side){return (L.events||[]).filter(e=>e.kind==="goal"&&e.team===L[side]).length}
 function lvMyName(){return S.players.get(myPid())?.name||"Alguém"}
-function lvToast(msg){const old=document.querySelector(".lv-toast");if(old)old.remove();const t=el("div",{class:"lv-toast",role:"status",text:msg});document.body.append(t);setTimeout(()=>t.remove(),3400)}
+function lvToast(msg,action){const old=document.querySelector(".lv-toast");if(old)old.remove();const t=el("div",{class:"lv-toast",role:"status"},el("span",{text:msg}),action?el("button",{type:"button",class:"lv-toastbtn",text:action.label,onclick:()=>{t.remove();action.fn()}}):null);document.body.append(t);setTimeout(()=>t.remove(),action?6000:3400)}
 async function lvAwake(on){try{if(on&&!lvWake&&navigator.wakeLock)lvWake=await navigator.wakeLock.request("screen");if(!on&&lvWake){await lvWake.release();lvWake=null}}catch(e){lvWake=null}}
 /* regra do rodízio com 3 times */
 function lvPlan(L,ga,gb){
@@ -867,7 +867,7 @@ async function lvStart(){
     tx.set(liveRef(),{...L,fresh:null,drawAt:S.saved.at,status:"running",startedAt:now,sessionStart:L.sessionStart||now,dur:L.fmt==="2"?LV.SESSION:LV.MATCH3,events:[{id:"s"+now,kind:"start",by:myPid(),at:now}]})});
   if(ok)lvAwake(true);
 }
-async function lvGoal(ev){try{await updateDoc(liveRef(),{events:arrayUnion(ev)});lvToast(`Gol do ${TEAMS[ev.team][0]}${ev.scorer&&ev.scorer!=="?"?`: ${ev.own?"contra de ":""}${getP(ev.scorer)?.name||""}`:""} aos ${ev.min}'.`)}
+async function lvGoal(ev){try{await updateDoc(liveRef(),{events:arrayUnion(ev)});lvToast(`Gol do ${TEAMS[ev.team][0]}${ev.scorer&&ev.scorer!=="?"?`: ${ev.own?"contra de ":""}${getP(ev.scorer)?.name||""}`:""} aos ${ev.min}'.`,{label:"Desfazer",fn:()=>lvUndo(ev)})}
   catch(e){console.error(e);status("Não deu para marcar o gol. Confira a internet e tente de novo.",true)}}
 async function lvUndo(ev){try{await updateDoc(liveRef(),{events:arrayRemove(ev)});lvToast("Gol desfeito.")}catch(e){console.error(e);status("Não deu para desfazer o gol.",true)}}
 async function lvEnd(expectedGame,chosenOut){
@@ -917,25 +917,39 @@ async function lvForceOpen(){const until=Date.now()+3*3600e3;
   const ok=await lvTx(async(tx,cur)=>{const L=cur&&cur.drawAt===S.saved.at?cur:lvState();tx.set(liveRef(),{...L,fresh:null,drawAt:S.saved.at,forceUntil:until})});
   if(ok)lvToast("Partida ao vivo aberta pelas próximas 3 horas.")}
 /* ---------- tela ---------- */
-function lvSheet(tc,...kids){const sheet=el("div",{class:"lv-sheet",role:"dialog","aria-modal":"true",style:`--tc:${tc}`},...kids);
+function lvSheet(tc,...kids){document.body.classList.add("lv-lock");document.querySelector(".lv-toast")?.remove();const sheet=el("div",{class:"lv-sheet",role:"dialog","aria-modal":"true",style:`--tc:${tc}`},...kids);
   const scrim=el("div",{class:"lv-scrim",onclick:e=>{if(e.target===scrim)lvClose()}},sheet);$("lvLayer").replaceChildren(scrim);const f=sheet.querySelector("button");if(f)f.focus()}
-function lvClose(){$("lvLayer").replaceChildren()}
+function lvClose(){$("lvLayer").replaceChildren();document.body.classList.remove("lv-lock")}
 document.addEventListener("keydown",e=>{if(e.key==="Escape")lvClose()});
+/* Lançar gol no celular em 2 toques: 1) quem fez (grade de botões grandes); 2) quem deu a assistência ou "Sem assistência".
+   O gol é salvo no 2º toque. "Não sei quem fez" e gol contra salvam no 1º toque. Depois aparece o aviso com Desfazer. */
 function lvOpenGoal(L,t){
-  const T=lvTeam(t),opp=t===L.a?L.b:L.a,O=lvTeam(opp);const sel={scorer:null,own:false,assist:null};const min=lvMin(L);const gameNo=L.gameNo||0;
-  const scorers=el("div",{class:"lv-chips"}),owns=el("div",{class:"lv-chips"}),assists=el("div",{class:"lv-chips"}),aTitle=el("h4",{text:"Assistência (opcional)"});
-  const ok=el("button",{class:"btn primary big",type:"button",disabled:true,text:"Confirmar gol",style:"flex:1",onclick:()=>{
-    const cur=lvState();if(cur.status!=="running"||(cur.gameNo||0)!==gameNo){lvClose();status("Essa partida já foi encerrada.",true);return}
-    lvClose();lvGoal({id:"g"+Date.now()+Math.random().toString(36).slice(2,6),kind:"goal",team:t,scorer:sel.scorer,own:sel.own,assist:sel.own||sel.scorer==="?"?null:sel.assist,min,by:myPid(),at:Date.now()})}});
-  const chip=(txt,on,fn,alt)=>el("button",{type:"button",class:"lv-chip"+(alt?" alt":""),"aria-pressed":String(!!on),text:txt,onclick:fn});
-  function paint(){
-    scorers.replaceChildren(...T.ids.map(id=>chip(getP(id).name,!sel.own&&sel.scorer===id,()=>{sel.scorer=id;sel.own=false;paint()})),chip("Não sei quem fez",sel.scorer==="?",()=>{sel.scorer="?";sel.own=false;sel.assist=null;paint()},true));
-    owns.replaceChildren(...O.ids.map(id=>chip(getP(id).name,sel.own&&sel.scorer===id,()=>{sel.scorer=id;sel.own=true;sel.assist=null;paint()},true)));
-    const showA=sel.scorer&&!sel.own&&sel.scorer!=="?";aTitle.hidden=assists.hidden=!showA;
-    assists.replaceChildren(...T.ids.filter(id=>id!==sel.scorer).map(id=>chip(getP(id).name,sel.assist===id,()=>{sel.assist=sel.assist===id?null:id;paint()})),chip("Sem assistência",!sel.assist,()=>{sel.assist=null;paint()},true));
-    ok.disabled=!sel.scorer}
-  lvSheet(T.c,el("h3",{text:`Gol do ${T.name} · ${min}'`}),el("h4",{text:"Quem fez"}),scorers,aTitle,assists,el("h4",{text:`Gol contra de alguém do ${O.name}`}),owns,
-    el("div",{class:"lv-actions"},el("button",{class:"btn",type:"button",text:"Cancelar",onclick:lvClose}),ok));paint();
+  const T=lvTeam(t),opp=t===L.a?L.b:L.a,O=lvTeam(opp);const min=lvMin(L);const gameNo=L.gameNo||0;
+  const save=(scorer,own,assist)=>{const cur=lvState();if(cur.status!=="running"||(cur.gameNo||0)!==gameNo){lvClose();status("Essa partida já foi encerrada.",true);return}
+    lvClose();lvGoal({id:"g"+Date.now()+Math.random().toString(36).slice(2,6),kind:"goal",team:t,scorer,own,assist:assist||null,min,by:myPid(),at:Date.now()})};
+  const pbtn=(id,onclick,cls)=>{const p=getP(id);return el("button",{type:"button",class:"lv-pbtn"+(cls?" "+cls:""),onclick},el("span",{class:"nm",text:p.name}),el("span",{class:"ps",text:POS[posOf(p)]?.[1]||""}))};
+  const order=ids=>[...ids].sort((a,b)=>POS_KEYS.indexOf(posOf(getP(b)))-POS_KEYS.indexOf(posOf(getP(a)))||getP(a).name.localeCompare(getP(b).name,"pt-BR"));
+  const body=el("div",{class:"lv-gbody"}),head=el("div",{class:"lv-ghead"}),foot=el("div",{class:"lv-gfoot"});
+  function step1(){
+    head.replaceChildren(el("h3",{text:`Gol do ${T.name} · ${min}'`}),el("p",{class:"lv-q",text:"Quem fez o gol?"}));
+    body.replaceChildren(el("div",{class:"lv-pgrid"},...order(T.ids).map(id=>pbtn(id,()=>step2(id)))),
+      el("button",{type:"button",class:"lv-link",text:`Foi gol contra de alguém do ${O.name}?`,onclick:stepOwn}));
+    foot.replaceChildren(el("button",{type:"button",class:"btn",text:"Cancelar",onclick:lvClose}),el("button",{type:"button",class:"btn lv-unk",text:"Não sei quem fez",onclick:()=>save("?",false,null)}));
+  }
+  function step2(scorer){
+    const mates=order(T.ids.filter(id=>id!==scorer));
+    head.replaceChildren(el("h3",{text:`Gol de ${getP(scorer).name} · ${min}'`}),el("p",{class:"lv-q",text:"Quem deu a assistência?"}));
+    body.replaceChildren(el("div",{class:"lv-pgrid"},...mates.map(id=>pbtn(id,()=>save(scorer,false,id)))),
+      el("button",{type:"button",class:"lv-link",text:"← Trocar quem fez o gol",onclick:step1}));
+    foot.replaceChildren(el("button",{type:"button",class:"btn primary big lv-noast",text:"Sem assistência · salvar gol",onclick:()=>save(scorer,false,null)}));
+  }
+  function stepOwn(){
+    head.replaceChildren(el("h3",{text:`Gol contra · ${min}'`}),el("p",{class:"lv-q",text:`Quem do ${O.name} fez contra? O gol conta para o ${T.name}.`}));
+    body.replaceChildren(el("div",{class:"lv-pgrid"},...order(O.ids).map(id=>pbtn(id,()=>save(id,true,null),"own"))),
+      el("button",{type:"button",class:"lv-link",text:"← Voltar",onclick:step1}));
+    foot.replaceChildren(el("button",{type:"button",class:"btn",text:"Cancelar",onclick:lvClose}));
+  }
+  lvSheet(T.c,head,body,foot);step1();
 }
 function lvOpenEnd(L){
   const ga=lvGoals(L,"a"),gb=lvGoals(L,"b"),A=lvTeam(L.a),B=lvTeam(L.b);const gameNo=L.gameNo||0;
@@ -996,8 +1010,8 @@ function renderAoVivo(){
       el("p",{class:"note",style:"margin:8px 0 0",text:"No 1º jogo o perdedor sai. Depois, sai sempre quem jogou 2 seguidas."}));
   }else{
     if(L.status==="running"){const A=lvTeam(L.a),B=lvTeam(L.b);
-      ctl.append(el("div",{class:"lv-goalbtns"},el("button",{class:"lv-goalbtn",type:"button",style:`--tc:${A.c}`,onclick:()=>lvOpenGoal(lvState(),L.a)},"+ Gol "+A.name,el("small",{text:"toque e escolha quem fez"})),
-        el("button",{class:"lv-goalbtn",type:"button",style:`--tc:${B.c}`,onclick:()=>lvOpenGoal(lvState(),L.b)},"+ Gol "+B.name,el("small",{text:"toque e escolha quem fez"}))),
+      ctl.append(el("div",{class:"lv-goalbtns"},el("button",{class:"lv-goalbtn",type:"button",style:`--tc:${A.c}`,onclick:()=>lvOpenGoal(lvState(),L.a)},"+ Gol "+A.name,el("small",{text:"toque para marcar"})),
+        el("button",{class:"lv-goalbtn",type:"button",style:`--tc:${B.c}`,onclick:()=>lvOpenGoal(lvState(),L.b)},"+ Gol "+B.name,el("small",{text:"toque para marcar"}))),
         el("button",{class:"btn big lv-end",type:"button",text:fmt==="2"?"Encerrar pelada":"Encerrar partida",onclick:()=>lvOpenEnd(lvState())}),
         el("div",{class:"lv-cancel"},confirmBtn("Cancelar início",(L.events||[]).some(e=>e.kind==="goal")?"Toque de novo: volta para antes do começo e apaga os gols marcados":"Toque de novo: volta para antes do começo",()=>lvCancelStart(L.gameNo||0),"mini danger")))}
     else ctl.append(el("button",{class:"btn primary big",type:"button",style:"width:100%",text:fmt==="2"?"Começar a pelada":`Começar ${TEAMS[L.a][0]} x ${TEAMS[L.b][0]}`,onclick:lvStart}));

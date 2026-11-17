@@ -347,7 +347,21 @@ button.btn.lv-end{width:100%;margin-top:10px;background:var(--vest);border-color
 .lv-sum .n{font-size:50px;font-variant-numeric:tabular-nums}
 .lv-sum i{width:14px;height:14px;border-radius:4px;background:var(--tc)}
 .lv-rule{background:var(--chalk);border-radius:10px;padding:10px 12px;font-size:14px}
-.lv-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--head);color:var(--head-ink);border:1px solid var(--vest);border-radius:12px;padding:10px 14px;font-size:14px;max-width:min(92%,460px);box-shadow:0 10px 30px rgb(0 0 0 / .3)}
+body.lv-lock{overflow:hidden}
+.lv-ghead h3{margin:0}
+.lv-q{margin:4px 0 12px;font:600 16px var(--body);color:var(--muted)}
+.lv-pgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.lv-pbtn{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:58px;padding:10px 12px;border:2px solid var(--line);border-radius:12px;background:var(--bg);color:var(--fg);font:600 16px/1.2 var(--body);text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.lv-pbtn .nm{min-width:0;overflow-wrap:anywhere}
+.lv-pbtn .ps{flex:none;font:700 11px var(--body);letter-spacing:.06em;color:var(--muted)}
+.lv-pbtn:active{border-color:var(--tc);background:color-mix(in srgb,var(--tc) 16%,var(--bg))}
+.lv-pbtn.own{border-style:dashed}
+.lv-link{display:block;margin:14px auto 4px;background:none;border:0;color:var(--muted);font:600 14px var(--body);text-decoration:underline;cursor:pointer;padding:8px}
+.lv-gfoot{position:sticky;bottom:calc(-16px - env(safe-area-inset-bottom,0px));margin:12px -4px 0;padding:12px 4px calc(16px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line);display:flex;gap:8px}
+.lv-gfoot .btn{flex:1 1 auto;min-height:50px;font-size:16px}
+.lv-gfoot .lv-unk{flex:1.4 1 auto}
+.lv-toastbtn{margin-left:12px;background:var(--vest);color:var(--vest-ink);border:0;border-radius:8px;font:700 14px var(--body);padding:6px 12px;cursor:pointer}
+.lv-toast{display:flex;align-items:center;justify-content:space-between;width:max-content;box-sizing:border-box;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--head);color:var(--head-ink);border:1px solid var(--vest);border-radius:12px;padding:10px 14px;font-size:14px;max-width:min(calc(100vw - 32px),460px);box-shadow:0 10px 30px rgb(0 0 0 / .3)}
 .team li .n.top{color:var(--vest);font-weight:700}
 .topline{font:600 12px var(--body);color:var(--muted);margin-top:2px}
 .rpguest{display:flex;flex-direction:column;gap:8px;margin-top:10px;background:var(--chalk);border-radius:10px;padding:10px}
