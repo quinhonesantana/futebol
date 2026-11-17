@@ -791,7 +791,10 @@ function stepper(val,onChange,label,what){what=what||"gol";
 function renderMatchForm(){
   const box=$("matchForm");box.replaceChildren();if(!S.isAdmin)return;
   const ed=MF?.edit;
-  box.append(el("h2",{text:ed?"Editar jogo":"Lançar jogo"}));
+  /* o formulário manual fica escondido; abre no botão Lançar jogo (ou ao editar um jogo) */
+  if(!ed&&!S.mfOpen){box.append(el("button",{class:"btn primary",type:"button",style:"margin-top:16px",text:"+ Lançar jogo",onclick:()=>{S.mfOpen=true;renderMatchForm()}}));return}
+  box.append(el("div",{class:"dhead",style:"margin-top:16px"},el("h2",{style:"margin:0",text:ed?"Editar jogo":"Lançar jogo"}),
+    ed?null:el("button",{class:"btn",type:"button",text:"Fechar",onclick:()=>{S.mfOpen=false;renderMatchForm()}})));
   if(!ed){
     if(!S.saved){box.append(el("p",{class:"lead",text:"Publique um sorteio na aba Sorteio para lançar os resultados com aqueles times."}));return}
     if(!MF||MF.drawAt!==S.saved.at)MF=newMF();if(!MF)return}
@@ -1237,7 +1240,7 @@ function startData(){
   if(S.isAdmin)unsubs.push(S.db.collection("admins").onSnapshot(s=>{S.adminPhones=new Set(s.docs.map(d=>d.id));if(tab==="grupo")renderGrupo()},fail));
   if(S.isAdmin)unsubs.push(S.db.collection("phoneIndex").onSnapshot(s=>{S.phones=new Map(s.docs.map(d=>[d.data().pid,digitsOf(d.id)]));if(tab==="grupo")renderGrupo()},fail));
 }
-function resetState(){stopData();S.uid=null;S.isAdmin=S.isOwner=false;S.loaded=false;S.players=new Map();S.ratings=new Map();S.claims=new Map();S.phones=new Map();S.adminPhones=null;S.visitor=false;S.pub=null;S.pubLast=null;clearTimeout(pubTimer);S.live=null;S.lvPick=[];S.lvAutoDone=false;S.mine={};S.savedMine={};S.notes={locked:false};S.dirty=false;S.saved=null;S.draw=null;S.matches=[];MF=null;S.drawHist=[];S.histLoaded=false}
+function resetState(){stopData();S.uid=null;S.isAdmin=S.isOwner=false;S.loaded=false;S.players=new Map();S.ratings=new Map();S.claims=new Map();S.phones=new Map();S.adminPhones=null;S.visitor=false;S.pub=null;S.pubLast=null;clearTimeout(pubTimer);S.live=null;S.lvPick=[];S.lvAutoDone=false;S.mine={};S.savedMine={};S.notes={locked:false};S.dirty=false;S.saved=null;S.draw=null;S.matches=[];MF=null;S.mfOpen=false;S.drawHist=[];S.histLoaded=false}
 /* Lê o vínculo deste aparelho (claims/<uid>) e decide para onde ir. */
 /* quem está logado guarda no histórico o sorteio publicado assim que ele tiver jogo (ou se os times mudarem depois) */
 function syncArchive(){if(S.histLoaded&&S.loaded!==undefined&&S.saved&&myPid())archiveDraw()}
