@@ -92,6 +92,12 @@ service cloud.firestore {
       allow create, update: if hasClaim() && id == 'notes' && request.resource.data.locked == true;
     }
 
+    // Histórico: qualquer jogador logado guarda o sorteio depois que sai o 1º jogo; só organizador apaga.
+    match /drawHistory/{id} {
+      allow read: if signed();
+      allow create, update: if hasClaim();
+      allow delete: if isAdmin();
+    }
     match /draws/{id} {
       allow read: if signed();
       allow write: if isAdmin();

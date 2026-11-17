@@ -69,26 +69,29 @@ function profile(pid){
 }
 
 /* ---------- abas ---------- */
-let tab=ls("tab")||"avaliar";
+/* o app sempre abre na aba Ao vivo, para todo mundo */
+let tab="aovivo";
 /* avisa o Tag Manager de cada aba aberta, já que o app não troca de página */
 const TAB_NAMES={perfis:"jogadores",aovivo:"ao_vivo"};
 function track(name){try{(window.dataLayer=window.dataLayer||[]).push({event:"aba_aberta",aba:TAB_NAMES[name]||name,visitante:!myPid()})}catch(e){}}
 function setTab(t){if(t!==tab)status("");tab=t;ls("tab",t);track(t);render()}
-let vtab=ls("vtab")||"entrar";
+let vtab="aovivo";
+$("entrarBtn").addEventListener("click",()=>{vtab="entrar";track("entrar");render();window.scrollTo({top:0})});
 document.querySelectorAll("#tabs button").forEach(b=>b.addEventListener("click",()=>{if(!myPid()){vtab=b.dataset.tab;ls("vtab",vtab);track(vtab);render();window.scrollTo({top:0});return}setTab(b.dataset.tab)}));
 const VIEWS=["avaliar","perfis","sorteio","aovivo","resultados","grupo"];
 function renderShell(){
   const me=myPid(),g=gated();
   $("tabs").hidden=!me;$("v-login").hidden=!!me;$("loginLogo").hidden=!!me;
   if(!me){
-    /* visitante: abas Entrar, Perfis e Resultados */
-    const vis=S.visitor;if(!vis||!["entrar","perfis","aovivo","resultados"].includes(vtab))vtab="entrar";
+    /* visitante: abas Jogadores, Ao vivo e Resultados; Entrar fica no alto, à direita */
+    const vis=S.visitor;if(vis&&!["entrar","perfis","aovivo","resultados"].includes(vtab))vtab="aovivo";const cur=vis?vtab:"entrar";
+    $("entrarBtn").hidden=!(vis&&cur!=="entrar");
     $("tabs").hidden=!vis;
-    for(const b of document.querySelectorAll("#tabs button")){const t=b.dataset.tab;b.hidden=!(t==="entrar"||t==="perfis"||t==="aovivo"||t==="resultados");b.disabled=false;b.title="";b.setAttribute("aria-selected",String(t===vtab))}
-    $("v-login").hidden=vtab!=="entrar";$("loginLogo").hidden=vtab!=="entrar";
-    for(const v of VIEWS)$("v-"+v).hidden=!(vis&&v===vtab);
-    $("visitorHead").hidden=!(vis&&vtab!=="entrar");$("who").textContent="";return false}
-  $("visitorHead").hidden=true;$("tab-entrar").hidden=true;for(const t of ["avaliar","perfis","sorteio","aovivo","resultados"])$("tab-"+t).hidden=false;
+    for(const b of document.querySelectorAll("#tabs button")){const t=b.dataset.tab;b.hidden=!(t==="perfis"||t==="aovivo"||t==="resultados");b.disabled=false;b.title="";b.setAttribute("aria-selected",String(t===cur))}
+    $("v-login").hidden=cur!=="entrar";$("loginLogo").hidden=cur!=="entrar";
+    for(const v of VIEWS)$("v-"+v).hidden=!(vis&&v===cur);
+    $("visitorHead").hidden=!(vis&&cur!=="entrar");$("who").textContent="";return false}
+  $("visitorHead").hidden=true;$("tab-entrar").hidden=true;$("entrarBtn").hidden=true;for(const t of ["avaliar","perfis","sorteio","aovivo","resultados"])$("tab-"+t).hidden=false;
   $("tab-grupo").hidden=!S.isAdmin;
   for(const t of ["perfis","sorteio","resultados"]){$("tab-"+t).disabled=g;$("tab-"+t).title=g?"Libera depois que você avaliar todo o grupo":""}
   if((tab==="perfis"||tab==="sorteio"||tab==="resultados")&&g)tab="avaliar";
@@ -404,9 +407,18 @@ function dateBR(ts){return new Date(ts).toLocaleDateString("pt-BR",{day:"2-digit
 function waText(teams,at,res,subs){let s=`⚽ Peixe Futebol Clube · times de ${dateBR(at)}\n`;teams.forEach((t,i)=>{const st=teamStats(t);s+=`\n*Time ${TEAMS[i][0]}* (média ${fmt(st.ovr)})\n`;t.forEach(id=>{const p=hasP(id)?{id,...getP(id)}:null;if(p)s+=`- ${dName(id)} (${posLabel(p)})\n`});const sb=(subs&&subs[i])||[];if(sb.length)s+=`_Reservas:_ ${sb.map(id=>`${dName(id)} (${posLabel({id,...getP(id)})})`).join(", ")}\n`});
   if(res.length){s+=`\n*Reservas* (entram por ordem de chegada)\n`;res.forEach((id,i)=>{const p={id,...getP(id)};s+=`${i+1}. ${dName(id)} (${posLabel(p)})\n`})}
   return s.trim()}
+/* Sorteio já usado: teve jogo e passaram 12 horas do último jogo (ou do encerramento do ao vivo), sem partida rolando.
+   Aí o app passa a aguardar o próximo sorteio; os times usados ficam em Resultados › Sorteios anteriores. */
+function drawUsed(){const d=S.saved;if(!d)return false;const ms=S.matches.filter(m=>m.drawAt===d.at);if(!ms.length)return false;
+  const L=S.live&&S.live.drawAt===d.at?S.live:null;if(L&&L.status==="running")return false;
+  return Date.now()-Math.max(...ms.map(m=>m.at),L?.closedAt||0)>12*3600e3}
+const usedDay=()=>{const ms=S.matches.filter(m=>m.drawAt===S.saved.at);return new Date(Math.min(...ms.map(m=>m.at))).toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit"})};
 function renderResult(){
   const r=$("result");r.replaceChildren();
+  const used=!S.draw&&drawUsed();
+  if(used&&!S.isAdmin){r.append(el("div",{class:"empty",style:"margin-top:24px"},el("strong",{text:"Aguardando o próximo sorteio"}),`Os times da pelada de ${usedDay()} estão guardados em Resultados › Sorteios anteriores. Quando os organizadores sortearem a próxima, os times aparecem aqui.`));return}
   const d=(S.isAdmin&&S.draw)||S.saved;
+  if(used)r.append(el("div",{class:"banner"},el("b",{text:"Esse sorteio já foi usado. "}),`Ele é da pelada de ${usedDay()} e está guardado em Resultados › Sorteios anteriores. Marque quem veio e sorteie de novo para a próxima pelada.`));
   if(!d){if(!S.isAdmin)r.append(el("div",{class:"empty",style:"margin-top:24px"},el("strong",{text:"Sorteio ainda não publicado"}),"Quando os organizadores publicarem os times, eles aparecem aqui."));return}
   const teams=d.teams.map(t=>t.filter(id=>hasP(id)));const res=(d.res||[]).filter(id=>hasP(id));const subs=d.subs?teams.map((_,i)=>(d.subs[i]||[]).filter(id=>hasP(id))):null;
   r.append(el("h2",{text:S.draw?"Times sorteados":"Sorteio publicado"}));
@@ -430,7 +442,7 @@ function renderResult(){
     const ok=()=>{b.textContent="Copiado";setTimeout(()=>b.textContent="Copiar para o WhatsApp",1800)};const fb=()=>{box.hidden=false;box.select()};
     try{navigator.clipboard.writeText(txt).then(ok,fb)}catch(e){fb()}}}));
   if(S.draw&&S.isAdmin)acts.append(el("button",{class:"btn",type:"button",text:"Publicar sorteio",onclick:async ev=>{const b=ev.currentTarget;b.disabled=true;
-    try{await S.db.doc("draws/latest").set({teams:Object.fromEntries(teams.map((t,i)=>["t"+i,t])),k:teams.length,res,subs:subs?Object.fromEntries(subs.map((x,i)=>["t"+i,x])):null,manual:!!d.manual,guests:Object.fromEntries([...teams.flat(),...res,...(subs||[]).flat()].filter(isGuest).map(id=>{const g=getP(id);return [id,{name:g.name,pos:g.pos,lvl:+g.lvl||3}]})),at:d.at});b.textContent="Publicado para todos";S.draw=null;status("Sorteio publicado. Todo o grupo já vê os times na aba Sorteio. Ainda dá para mover alguém tocando em Mover.")}catch(e){b.disabled=false;status(e.code==="permission-denied"?"Só organizadores podem publicar o sorteio.":"Não foi possível publicar o sorteio.",true)}}}));
+    try{if(S.saved&&S.saved.at!==d.at)await archiveDraw();await S.db.doc("draws/latest").set({teams:Object.fromEntries(teams.map((t,i)=>["t"+i,t])),k:teams.length,res,subs:subs?Object.fromEntries(subs.map((x,i)=>["t"+i,x])):null,manual:!!d.manual,guests:Object.fromEntries([...teams.flat(),...res,...(subs||[]).flat()].filter(isGuest).map(id=>{const g=getP(id);return [id,{name:g.name,pos:g.pos,lvl:+g.lvl||3}]})),at:d.at});b.textContent="Publicado para todos";S.draw=null;status("Sorteio publicado. Todo o grupo já vê os times na aba Sorteio. Ainda dá para mover alguém tocando em Mover.")}catch(e){b.disabled=false;status(e.code==="permission-denied"?"Só organizadores podem publicar o sorteio.":"Não foi possível publicar o sorteio.",true)}}}));
   if(S.isAdmin&&S.saved){const running=S.live&&S.live.drawAt===S.saved.at&&S.live.status==="running";
     acts.append(confirmBtn(S.draw?"Cancelar sorteio publicado":"Cancelar publicação",running?"Toque de novo: cancela e para a partida ao vivo sem salvar":"Toque de novo: o grupo deixa de ver os times",cancelPublish,"btn danger"))}
   r.append(acts,box,el("p",{class:"note",style:"margin-top:8px",text:"O número ao lado do nome é a nota geral do perfil."}));
@@ -496,10 +508,21 @@ function replaceSection(id,w,c){
     out.length?el("div",{class:"lv-chips"},...out.map(p=>el("button",{type:"button",class:"lv-chip",text:p.name,onclick:()=>doReplace(p.id,p.name)}))):el("p",{class:"note",style:"margin:0",text:"Todo o grupo já está no sorteio."}),
     el("div",{class:"rpguest"},el("b",{text:"Convidado"}),gName,el("div",{class:"row"},gPos,gLvl,gBtn),gErr)];
 }
+/* ---------- histórico de sorteios ----------
+   Depois que sai o primeiro jogo de um sorteio publicado, ele é guardado em drawHistory/<data do sorteio>
+   com os nomes de todo mundo. Se os times forem ajustados depois, o arquivo é atualizado. */
+S.drawHist=[];S.histLoaded=false;
+const drawSig=d=>JSON.stringify({t:d.teams,s:d.subs||null,r:d.res||[]});
+function drawArchiveDoc(d){const ids=[...d.teams.flat(),...(d.res||[]),...(d.subs||[]).flat()];
+  return {at:d.at,k:d.teams.length,teams:Object.fromEntries(d.teams.map((t,i)=>["t"+i,t])),subs:d.subs?Object.fromEntries(d.subs.map((x,i)=>["t"+i,x])):null,res:d.res||[],
+    names:Object.fromEntries(ids.filter(hasP).map(id=>[id,getP(id).name])),pos:Object.fromEntries(ids.filter(hasP).map(id=>[id,posOf(getP(id))])),guests:ids.filter(isGuest),sig:drawSig(d),archivedAt:Date.now()}}
+async function archiveDraw(d){d=d||S.saved;if(!d||!myPid())return;if(!S.matches.some(m=>m.drawAt===d.at))return;
+  const old=S.drawHist.find(h=>h.at===d.at);if(old&&old.sig===drawSig(d))return;
+  try{await S.db.doc("drawHistory/"+d.at).set(drawArchiveDoc(d))}catch(e){console.error(e)}}
 /* Cancela o sorteio publicado: o grupo deixa de ver os times e a partida ao vivo volta a esperar um sorteio.
    Jogos já encerrados continuam em Resultados. A prévia do organizador, se houver, continua na tela para publicar de novo. */
 async function cancelPublish(){
-  const at=S.saved?.at;
+  const at=S.saved?.at;await archiveDraw();
   if(S.live&&S.live.drawAt===at)await deleteDoc(doc(fs,"live","current"));
   await S.db.doc("draws/latest").delete();
   status("Publicação cancelada. O grupo não vê mais os times, e a partida ao vivo volta a aguardar um sorteio. Os jogos já encerrados continuam em Resultados.");
@@ -815,6 +838,24 @@ function renderMonthHead(ms,months){
   box.append(el("div",{class:"dhead"},el("h2",{text:resMonth==="all"?"Acumulado geral":"Acumulado de "+resMonthName(resMonth)}),sel),
     el("div",{class:"mstats"},...[[nights,nights===1?"noite":"noites"],[ms.length,ms.length===1?"jogo":"jogos"],[goals,goals===1?"gol":"gols"]].map(([v,t])=>el("div",{},el("b",{text:String(v)}),el("span",{text:t})))));
 }
+function renderDrawHist(){
+  const box=$("drawHist");box.replaceChildren();
+  const hs=S.drawHist.filter(h=>resMonth==="all"||monthKey(h.at)===resMonth);
+  if(!hs.length){box.append(el("p",{class:"note",text:"Os sorteios ficam guardados aqui depois que os jogos da noite acontecem."}));return}
+  for(const h of hs){
+    const ms=S.matches.filter(m=>m.drawAt===h.at).sort((a,b)=>a.at-b.at);const nm=id=>h.names?.[id]||getP(id)?.name||"?";
+    const day=new Date(ms[0]?.at||h.at).toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit"});
+    let champ="";if(ms.length){const {table}=daySummary(ms);const t=table[0];const tied=table.filter(x=>x.pts===t.pts&&(x.gp-x.gc)===(t.gp-t.gc)&&x.gp===t.gp);champ=tied.length>1?" · empate na ponta":` · campeão ${TEAMS[t.i][0]}`}
+    const teams=[];for(let i=0;i<(h.k||0);i++)teams.push({i,ids:h.teams["t"+i]||[],subs:(h.subs||{})["t"+i]||[]});
+    const tag=id=>{const k=h.pos?.[id]||posOf(getP(id));return k&&POS[k]?el("span",{class:"pos "+k,title:POS[k][0],text:POS[k][1]}):null};
+    const body=el("div",{class:"hbody"},
+      el("div",{class:"lv-rosters"},...teams.map(t=>el("div",{class:"lv-roster",style:`--tc:var(${TEAMS[t.i][1]})`},el("h3",{text:TEAMS[t.i][0]}),
+        el("ul",{},...[...t.ids,...t.subs].map(id=>el("li",{},tag(id),el("span",{class:"n",text:nm(id)+((h.guests||[]).includes(id)?" (convidado)":"")}),t.subs.includes(id)?el("span",{class:"lv-sub",text:"reserva"}):null)))))),
+      h.res?.length?el("p",{class:"note",style:"margin:10px 0 0",text:"Reservas: "+h.res.map(nm).join(", ")}):null,
+      ms.length?el("div",{class:"hgames"},...ms.map(m=>el("div",{class:"lv-gameline"},TEAMS[m.a.team][0],el("b",{text:` ${m.a.goals} x ${m.b.goals} `}),TEAMS[m.b.team][0]))):null);
+    box.append(el("details",{class:"hcard"},el("summary",{},el("b",{text:cap(day)}),el("span",{class:"note",text:` · ${teams.length} times · ${ms.length} ${ms.length===1?"jogo":"jogos"}${champ}`})),body));
+  }
+}
 function renderResultados(){
   renderMatchForm();
   const now=monthKey(Date.now());const months=[...new Set([now,...S.matches.map(m=>monthKey(m.at))])].sort().reverse();
@@ -843,6 +884,7 @@ function renderResultados(){
       el("tbody",{},...rows.map(r=>{const a=adj.get(r.id)||0;return el("tr",{},el("td",{text:r.name}),...[r.j,r.v,r.e,r.d,r.g,r.a,isZag(r.id)?r.cs:"–",r.pts].map(v=>el("td",{text:String(v)})),el("td",{class:"n",text:(a>=0?"+":"−")+Math.abs(a).toFixed(2).replace(".",",")}))})))))}
   const ml=$("matchList");ml.replaceChildren();
   if(!ms.length){ml.append(el("div",{class:"empty"},el("strong",{text:resMonth==="all"?"Nenhum jogo lançado":"Nenhum jogo em "+resMonthName(resMonth)}),S.isAdmin?"Lance o primeiro jogo no formulário acima.":"Os jogos aparecem aqui quando os organizadores lançarem."));return}
+  renderDrawHist();
   let day="";
   for(const m of ms){
     const dk=dateBR(m.at);if(dk!==day){day=dk;ml.append(el("div",{class:"mday",text:new Date(m.at).toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit"})}))}
@@ -877,7 +919,7 @@ function lvState(){
   const fmt=lvFmt();return {drawAt:S.saved?.at,fmt,status:fmt==="2"?"ready":"setup",a:fmt==="2"?0:null,b:fmt==="2"?1:null,queue:[],streak:{},gameNo:0,events:[],startedAt:null,sessionStart:null,dur:fmt==="2"?LV.SESSION:LV.MATCH3,fresh:true}}
 function lvOpen(){if(!S.saved)return false;const L=lvState();if(L.status==="running")return true;
   /* depois de encerrar o ao vivo, o resumo do dia fica na tela por 12 horas */
-  if(L.status==="done"&&L.closedAt&&Date.now()-L.closedAt<12*3600e3)return true;if((L.forceUntil||0)>Date.now())return true;return lvWindow(Date.now()).open}
+  if(L.status==="done"&&L.closedAt&&Date.now()-L.closedAt<12*3600e3)return true;if((L.forceUntil||0)>Date.now())return true;if(drawUsed())return false;return lvWindow(Date.now()).open}
 const lvIds=i=>[...(S.saved.teams[i]||[]),...((S.saved.subs||[])[i]||[])].filter(hasP);
 const lvIsSub=(i,id)=>((S.saved.subs||[])[i]||[]).includes(id);
 const lvTeam=i=>({name:TEAMS[i][0],c:`var(${TEAMS[i][1]})`,ids:lvIds(i)});
@@ -1017,20 +1059,23 @@ function lvRoster(t,L,goalsById){const T=lvTeam(t);
     return el("li",{},posTag(p,true),el("span",{class:"n",text:dName(id)}),lvIsSub(t,id)?el("span",{class:"lv-sub",text:"reserva"}):null,g?el("span",{class:"lv-balls",text:g+(g>1?" gols":" gol")}):null)})))}
 function lvLastNight(box){const dr=el("section",{class:"dayres lv-night"});renderDayResults(dr,false);if(dr.childNodes.length)box.append(dr)}
 function lvWaiting(box){
-  const w=lvWindow(Date.now());const when=new Date(w.next);
+  const w=lvWindow(Date.now());const when=new Date(w.next);const has=!!S.saved&&!drawUsed();
   const cd=el("div",{class:"lv-cd",id:"lvCountdown"});
   box.append(el("div",{class:"lv-gate"},el("img",{src:"logo.jpg",alt:"Escudo do Peixe Futebol Clube",class:"lv-crest"}),
-    S.saved?el("span",{class:"lv-state ok",text:"Times publicados"}):el("span",{class:"lv-state wait",text:"Aguardando o sorteio"}),
+    has?el("span",{class:"lv-state ok",text:"Times publicados"}):el("span",{class:"lv-state wait",text:"Aguardando o sorteio"}),
     el("h2",{text:"Próxima pelada"}),el("div",{class:"lv-when",text:`${when.toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"2-digit"})} · 19:30`}),cd,
-    el("p",{class:"note",text:S.saved?"A partida ao vivo abre sozinha na segunda às 19:30, com os times publicados.":"A partida ao vivo abre na segunda às 19:30, depois que os organizadores publicarem os times."}),
-    S.saved&&S.isAdmin?el("button",{class:"btn",type:"button",text:"Abrir agora (fora do horário)",onclick:lvForceOpen}):null,
-    !S.saved&&S.isAdmin?el("p",{class:"note"},el("b",{text:"Organizador: "}),"publique o sorteio na aba Sorteio para liberar esta tela."):null));
+    el("p",{class:"note",text:has?"A partida ao vivo abre sozinha na segunda às 19:30, com os times publicados.":"A partida ao vivo abre na segunda às 19:30, depois que os organizadores publicarem os times."}),
+    has&&S.isAdmin?el("button",{class:"btn",type:"button",text:"Abrir agora (fora do horário)",onclick:lvForceOpen}):null,
+    !has&&S.isAdmin?el("p",{class:"note"},el("b",{text:"Organizador: "}),"publique o sorteio na aba Sorteio para liberar esta tela."):null));
   lvLastNight(box);
-  if(S.saved){const pv=el("div",{class:"lv-rosters",style:"margin-top:14px"});S.saved.teams.forEach((_,i)=>pv.append(lvRoster(i,null,{})));box.append(pv)}
+  if(has){const pv=el("div",{class:"lv-rosters",style:"margin-top:14px"});S.saved.teams.forEach((_,i)=>pv.append(lvRoster(i,null,{})));box.append(pv)}
   lvTick();
 }
 function renderAoVivo(){
   const box=$("v-aovivo");box.replaceChildren();
+  if(gated()){const n=pending().length;box.append(el("div",{class:"banner",style:"margin:0 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"},
+    el("span",{style:"flex:1;min-width:200px",text:`Falta você avaliar ${n} ${n===1?"jogador":"jogadores"}. Jogadores, Sorteio e Resultados liberam depois disso.`}),
+    el("button",{class:"btn primary",type:"button",text:"Avaliar agora",onclick:()=>setTab("avaliar")})))}
   if(!lvOpen()){lvWaiting(box);return}
   const L=lvState();const fmt=L.fmt;
   if(L.status==="done"){const ms=S.matches.filter(m=>m.drawAt===S.saved.at).sort((a,b)=>a.at-b.at);box.append(el("div",{class:"lv-gate"},el("img",{src:"logo.jpg",alt:"",class:"lv-crest"}),el("span",{class:"lv-state",text:"Pelada encerrada"}),el("h2",{text:"Valeu, Peixe!"}),
@@ -1177,14 +1222,17 @@ function startData(){
     S.claims=new Map(s.docs.map(d=>[d.id,d.id]));if(S.uid)S.claims.set(S.uid,S.uid);
     if(S.uid){S.savedMine=JSON.parse(JSON.stringify(S.ratings.get(S.uid)?.scores||{}));if(!S.dirty)S.mine=JSON.parse(JSON.stringify(S.savedMine))}ready("ratings");schedulePub()},fail));
   unsubs.push(S.db.doc("config/notes").onSnapshot(d=>{S.notes=d.exists?d.data():{locked:false};if(tab==="avaliar"&&!S.dirty)render();else if(tab==="grupo")renderNotesBox()},fail));
-  unsubs.push(S.db.collection("matches").onSnapshot(s=>{S.matches=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.at-a.at);if(tab==="resultados"||tab==="perfis"||tab==="aovivo")render()},fail));
+  unsubs.push(S.db.collection("matches").onSnapshot(s=>{S.matches=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.at-a.at);syncArchive();if(tab==="resultados"||tab==="perfis"||tab==="aovivo"||tab==="sorteio")render()},fail));
+  unsubs.push(S.db.collection("drawHistory").onSnapshot(s=>{S.drawHist=s.docs.map(d=>d.data()).sort((a,b)=>b.at-a.at);S.histLoaded=true;syncArchive();if(tab==="resultados")render()},fail));
   unsubs.push(onSnapshot(doc(fs,"live","current"),d=>{S.live=d.exists()?d.data():null;lvAutoHome();if(tab==="aovivo")renderAoVivo()},fail));
-  unsubs.push(S.db.doc("draws/latest").onSnapshot(d=>{applyDraw(d);lvAutoHome();if(tab==="sorteio")renderResult();else if(tab==="aovivo")renderAoVivo()},fail));
+  unsubs.push(S.db.doc("draws/latest").onSnapshot(d=>{applyDraw(d);lvAutoHome();syncArchive();if(tab==="sorteio")renderResult();else if(tab==="aovivo")renderAoVivo()},fail));
   if(S.isAdmin)unsubs.push(S.db.collection("admins").onSnapshot(s=>{S.adminPhones=new Set(s.docs.map(d=>d.id));if(tab==="grupo")renderGrupo()},fail));
   if(S.isAdmin)unsubs.push(S.db.collection("phoneIndex").onSnapshot(s=>{S.phones=new Map(s.docs.map(d=>[d.data().pid,digitsOf(d.id)]));if(tab==="grupo")renderGrupo()},fail));
 }
-function resetState(){stopData();S.uid=null;S.isAdmin=S.isOwner=false;S.loaded=false;S.players=new Map();S.ratings=new Map();S.claims=new Map();S.phones=new Map();S.adminPhones=null;S.visitor=false;S.pub=null;S.pubLast=null;clearTimeout(pubTimer);S.live=null;S.lvPick=[];S.lvAutoDone=false;S.mine={};S.savedMine={};S.notes={locked:false};S.dirty=false;S.saved=null;S.draw=null;S.matches=[];MF=null}
+function resetState(){stopData();S.uid=null;S.isAdmin=S.isOwner=false;S.loaded=false;S.players=new Map();S.ratings=new Map();S.claims=new Map();S.phones=new Map();S.adminPhones=null;S.visitor=false;S.pub=null;S.pubLast=null;clearTimeout(pubTimer);S.live=null;S.lvPick=[];S.lvAutoDone=false;S.mine={};S.savedMine={};S.notes={locked:false};S.dirty=false;S.saved=null;S.draw=null;S.matches=[];MF=null;S.drawHist=[];S.histLoaded=false}
 /* Lê o vínculo deste aparelho (claims/<uid>) e decide para onde ir. */
+/* quem está logado guarda no histórico o sorteio publicado assim que ele tiver jogo (ou se os times mudarem depois) */
+function syncArchive(){if(S.histLoaded&&S.loaded!==undefined&&S.saved&&myPid())archiveDraw()}
 function applyDraw(d){if(d.exists){const x=d.data();const teams=[];for(let i=0;i<(x.k||0);i++)teams.push(x.teams["t"+i]||[]);S.savedGuests=x.guests||{};S.saved={teams,res:x.res||[],subs:x.subs?teams.map((_,i)=>x.subs["t"+i]||[]):null,at:x.at,manual:!!x.manual}}else S.saved=null}
 /* com uma partida rolando, o app abre direto na aba Ao vivo (uma vez a cada entrada) */
 function lvAutoHome(){
@@ -1201,6 +1249,7 @@ function startPublic(){
   unsubs.push(S.db.collection("players").onSnapshot(s=>{S.players=new Map(s.docs.map(d=>[d.id,d.data()]));render()},fail));
   unsubs.push(S.db.collection("matches").onSnapshot(s=>{S.matches=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.at-a.at);render()},fail));
   unsubs.push(S.db.doc("public/profiles").onSnapshot(d=>{S.pub=d.exists?d.data().p||{}:{};render()},fail));
+  unsubs.push(S.db.collection("drawHistory").onSnapshot(s=>{S.drawHist=s.docs.map(d=>d.data()).sort((a,b)=>b.at-a.at);S.histLoaded=true;if(vtab==="resultados")render()},fail));
 }
 /* Organizadores mantêm o resumo público (só médias) sempre que notas ou jogadores mudam. */
 let pubTimer=null;
@@ -1226,7 +1275,7 @@ async function boot(){
       else{/* jogador removido do grupo */await deleteDoc(claimRef()).catch(()=>{});resetState();$("logoutBtn").hidden=true;setStep("phone","Seu cadastro não está mais no grupo. Fale com o organizador.")}},150);
   }catch(x){console.error(x);status("Não deu para abrir o app. Confira a internet e recarregue a página.",true)}
 }
-$("logoutBtn").addEventListener("click",async()=>{try{await deleteDoc(claimRef())}catch(e){}tab="avaliar";await boot()});
+$("logoutBtn").addEventListener("click",async()=>{try{await deleteDoc(claimRef())}catch(e){}tab="aovivo";vtab="aovivo";await boot()});
 render();
 if(configured){
   S.db=DB;
